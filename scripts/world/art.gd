@@ -274,3 +274,43 @@ static func launch_ramp(ci: CanvasItem, surface: PackedVector2Array, col: Color,
 		var c := Color(1, 1, 1, 0.9 * a)
 		var tip := p + Vector2(0, -26) + dir * 12.0
 		ci.draw_polyline(PackedVector2Array([tip - dir * 14.0 + nrm * 11.0, tip, tip - dir * 14.0 - nrm * 11.0]), c, 5.0, true)
+
+
+## Bubbling foam on a bay's surface: the warning before a wave. `density` 0..1 grows as it nears.
+static func foam(ci: CanvasItem, x0: float, x1: float, y: float, density: float, t: float) -> void:
+	var n := int(6 + 18 * density)
+	for i in n:
+		var ph := fmod(t * (1.2 + 0.4 * sin(i * 1.7)) + i * 0.41, 1.0)
+		var u := fmod(i * 0.618, 1.0)
+		var bx := lerpf(x0 + 10.0, x1 - 10.0, u) + sin(t * 3.0 + i) * 6.0
+		var by := y + 2.0 - ph * (14.0 + 26.0 * density)
+		var r := (4.0 + 7.0 * density) * (1.0 - ph * 0.6)
+		ci.draw_circle(Vector2(bx, by), r, Color(1, 1, 1, (0.55 + 0.4 * density) * (1.0 - ph)))
+	ci.draw_line(Vector2(x0, y + 1.0), Vector2(x1, y + 1.0), Color(1, 1, 1, 0.5 + 0.4 * density), 5.0)
+
+
+## A standing beach wave: a teal wall around `mid` with a foamy lip curling to the left
+## (towards the oncoming bird), plus a soft shadow at its foot.
+static func wave(ci: CanvasItem, mid: float, half_w: float, water_y: float, h: float, water: Color, foam_col: Color, t: float) -> void:
+	shadow(ci, Vector2(mid, water_y + 6.0), half_w * 1.4, 12.0, 0.35)
+	var top := water_y - h
+	var pts := PackedVector2Array()
+	pts.append(Vector2(mid + half_w * 1.5, water_y + 4.0))
+	for i in 13:
+		var u := float(i) / 12.0
+		var x := mid + half_w * 1.5 - u * half_w * 2.7
+		var bulge := sin(u * PI) * 0.12 * h
+		var y := lerpf(water_y, top, sin(u * PI * 0.5)) - bulge * 0.2 + sin(t * 4.0 + u * 6.0) * 3.0
+		pts.append(Vector2(x, y))
+	pts.append(Vector2(mid - half_w * 1.2, top + h * 0.22))
+	pts.append(Vector2(mid - half_w * 1.0, water_y + 4.0))
+	ci.draw_colored_polygon(pts, water)
+	var face := PackedVector2Array([Vector2(mid - half_w * 0.9, water_y + 4.0), Vector2(mid - half_w * 0.95, top + h * 0.3), Vector2(mid - half_w * 0.2, top + h * 0.12), Vector2(mid + half_w * 0.2, water_y + 4.0)])
+	ci.draw_colored_polygon(face, water.darkened(0.18))
+	# curling foam lip
+	for i in 9:
+		var u := float(i) / 8.0
+		var cx := mid + half_w * (0.6 - u * 1.8)
+		var cy := top + h * 0.06 * sin(u * PI) + u * u * h * 0.2
+		ci.draw_circle(Vector2(cx, cy), 13.0 - u * 5.0 + sin(t * 6.0 + i) * 1.5, foam_col)
+	ci.draw_circle(Vector2(mid - half_w * 1.25, top + h * 0.24), 8.0, foam_col)

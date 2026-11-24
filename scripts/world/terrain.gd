@@ -17,7 +17,6 @@ const BAY_HALF := 300.0
 const BANK_Y := 40.0
 const KICK_BEFORE := 40.0
 const KICK_AFTER := 10.0
-const NEXT_BAY_MARGIN := 70.0   # = Wave.WAVE_HALF
 const LIP_COLOR := Color("#ff7a59")
 const LIP_EDGE := Color("#ffe066")
 
@@ -111,7 +110,7 @@ func bay_at(x: float) -> int:
 ## The first bay the bird at x has not fully passed yet, or -1.
 func next_bay(x: float) -> int:
 	for i in bays.size():
-		if bays[i].water_x1 + NEXT_BAY_MARGIN > x:
+		if bays[i].water_x1 + Wave.WAVE_HALF > x:
 			return i
 	return -1
 

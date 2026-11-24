@@ -165,3 +165,187 @@ func test_no_skim_over_bay() -> String:
 	b.position.y = Terrain.WATER_Y - 400.0
 	b.step(DT)
 	return "" if skims[0] == 0 else "skimmed over bay water"
+
+
+# ---------------------------------------------------------------- wave
+
+const CROSS_SEEDS := [4242, 7, 99, 1234, 555]
+
+
+## Runs the world until the bird is past bay i's far bank, dies, or 6 s pass.
+## `setup` positions the bird; returns deaths, kicks, passes and the lowest bird
+## center (largest y) seen inside the wave column.
+func _cross_bay(w: World, i: int, setup: Callable) -> Dictionary:
+	var bay: Dictionary = w.terrain.bays[i]
+	var r := {"deaths": [], "kicked": 0, "passed": 0, "low": -INF}
+	w.bird_died.connect(func(c: String): r.deaths.append(c))
+	w.bird.kicked.connect(func(): r.kicked += 1)
+	w.wave_passed.connect(func(): r.passed += 1)
+	setup.call(w.bird, bay)
+	var t := 0.0
+	while t < 6.0 and r.deaths.is_empty() and w.bird.position.x < bay.bank_x + 50.0:
+		w._physics_process(DT)
+		t += DT
+		var c := w.bird.center()
+		if absf(c.x - bay.mid) < Wave.WAVE_HALF:
+			r.low = maxf(r.low, c.y)
+	return r
+
+
+func _ground_speed(x: float, fever: bool) -> float:
+	var target := lerpf(Bird.SPEED_START, Bird.SPEED_MAX, clampf(x / Bird.SPEED_RAMP_X, 0.0, 1.0))
+	return 0.85 * target * (1.3 if fever else 1.0)
+
+
+func test_kick_clears_every_wave() -> String:
+	var worst := -INF
+	var worst_at := ""
+	for s in CROSS_SEEDS:
+		for first in [1, 0]:
+			for fever in [false, true]:
+				for i in Terrain.BAYS_PER_ISLAND:
+					var w := _world(s, first)
+					var setup := func(b: Bird, bay: Dictionary) -> void:
+						var x: float = bay.lip_x - 200.0
+						b.position = Vector2(x, w.terrain.height_at(x))
+						b.on_ground = true
+						b.fever = fever
+						b.vel = Vector2(_ground_speed(x, fever), 0.0)
+					var r := _cross_bay(w, i, setup)
+					_free(w)
+					if not r.deaths.is_empty() or r.kicked != 1 or r.passed != 1:
+						return "seed %d start %d fever %s bay %d: deaths=%s kicked=%d passed=%d low=%.1f crest=%.1f" % [s, first, fever, i, r.deaths, r.kicked, r.passed, r.low, Terrain.WATER_Y - Wave.WAVE_H]
+					if r.low > worst:
+						worst = r.low
+						worst_at = "seed %d start %d fever %s bay %d" % [s, first, fever, i]
+	print("  kick margin: lowest bird center in wave column y=%.1f (+pad %.0f) vs crest y=%.1f at %s" % [worst, Wave.HIT_PAD, Terrain.WATER_Y - Wave.WAVE_H, worst_at])
+	return ""
+
+
+func test_kick_clears_after_bonk() -> String:
+	for s in CROSS_SEEDS:
+		for i in Terrain.BAYS_PER_ISLAND:
+			var w := _world(s, 1)
+			var setup := func(b: Bird, bay: Dictionary) -> void:
+				var x: float = bay.lip_x - Terrain.LIP_RAMP
+				b.position = Vector2(x, w.terrain.height_at(x))
+				b.on_ground = true
+				b.vel = Vector2(0.6 * Bird.SPEED_START, 0.0)
+			var r := _cross_bay(w, i, setup)
+			_free(w)
+			if not r.deaths.is_empty() or r.passed != 1:
+				return "seed %d bay %d: deaths=%s passed=%d low=%.1f" % [s, i, r.deaths, r.passed, r.low]
+	return ""
+
+
+func test_low_slow_glide_hits_wave() -> String:
+	for s in CROSS_SEEDS:
+		for i in Terrain.BAYS_PER_ISLAND:
+			var w := _world(s, 1)
+			var setup := func(b: Bird, bay: Dictionary) -> void:
+				b.position = Vector2(bay.lip_x, Terrain.LIP_Y - 40.0)
+				b.on_ground = false
+				b.vel = Vector2(Bird.SPEED_START, 0.0)
+			var r := _cross_bay(w, i, setup)
+			_free(w)
+			if r.deaths != ["ombak"]:
+				return "seed %d bay %d: deaths=%s kicked=%d" % [s, i, r.deaths, r.kicked]
+	return ""
+
+
+func test_holding_clears_wave() -> String:
+	for s in CROSS_SEEDS:
+		var w := _world(s, 1)
+		w.input_enabled = true
+		w._touch_hold = true
+		var setup := func(b: Bird, bay: Dictionary) -> void:
+			b.position = Vector2(bay.lip_x, Terrain.LIP_Y - 40.0)
+			b.on_ground = false
+			b.vel = Vector2(Bird.SPEED_START, 0.0)
+		var r := _cross_bay(w, 0, setup)
+		_free(w)
+		if not r.deaths.is_empty() or r.passed != 1:
+			return "seed %d: deaths=%s passed=%d" % [s, r.deaths, r.passed]
+	return ""
+
+
+func test_foam_before_rise() -> String:
+	var w := _world(4242, 1)
+	var bay: Dictionary = w.terrain.bays[0]
+	var x: float = bay.mid - 2000.0
+	w.bird.position = Vector2(x, w.terrain.height_at(x) - 80.0)
+	w.bird.on_ground = false
+	w.bird.vel = Vector2(_ground_speed(x, false), 0.0)
+	var seq: Array = [w.wave.state]
+	var foam_d := INF
+	var h_at_mid := -1.0
+	var t := 0.0
+	while t < 8.0 and not w.dead and w.bird.position.x < bay.mid + 20.0:
+		# keep the bird safely above everything: this test only watches the wave
+		w.bird.position.y = minf(w.bird.position.y, Terrain.WATER_Y - Wave.WAVE_H - 200.0)
+		w._physics_process(DT)
+		t += DT
+		if w.wave.state != seq[seq.size() - 1]:
+			seq.append(w.wave.state)
+			if w.wave.state == "foam":
+				foam_d = bay.mid - w.bird.position.x
+		if h_at_mid < 0.0 and w.bird.position.x >= bay.mid:
+			h_at_mid = w.wave.height
+	if seq.slice(0, 3) != ["idle", "foam", "rise"]:
+		return "states=%s" % [seq]
+	if foam_d > Wave.FOAM_DIST or foam_d < Wave.FOAM_DIST - 30.0:
+		return "foam started at d=%.1f" % foam_d
+	return "" if is_equal_approx(h_at_mid, Wave.WAVE_H) else "height at mid=%.1f" % h_at_mid
+
+
+func test_no_monster_in_bay() -> String:
+	var w := _world(4242, 1)
+	var bay: Dictionary = w.terrain.bays[0]
+	w.bird.position = Vector2(bay.water_x0 - 100.0, Terrain.WATER_Y - 150.0)
+	w.bird.on_ground = false
+	w.bird.vel = Vector2(Bird.SPEED_START, 0.0)
+	while w.bird.position.x < bay.water_x1 + 100.0:
+		w.bird.position.y = Terrain.WATER_Y - 450.0
+		w.bird.vel.y = 0.0
+		w._physics_process(DT)
+		if w.monster.state != "idle":
+			return "monster armed over a bay"
+	return ""
+
+
+func test_menu_world_bay_bounces() -> String:
+	var w := _world(4242, 1, false)
+	var deaths: Array = []
+	w.bird_died.connect(func(c: String): deaths.append(c))
+	var bay: Dictionary = w.terrain.bays[0]
+	w.bird.position = Vector2(bay.water_x0, Terrain.WATER_Y - 60.0)
+	w.bird.on_ground = false
+	w.bird.vel = Vector2(Bird.SPEED_START, 0.0)
+	var saw_wave := false
+	for i in int(2.0 / DT):
+		w._physics_process(DT)
+		saw_wave = saw_wave or w.wave.state != "idle"
+	if not deaths.is_empty():
+		return "died in menu world: %s" % [deaths]
+	if not saw_wave:
+		return "no wave in menu world"
+	return "" if w.bird.position.y < Terrain.WATER_Y else "bird under water y=%f" % w.bird.position.y
+
+
+func test_fever_overshoot_passes_once() -> String:
+	var w := _world(4242, 1)
+	var passes := [0]
+	w.wave_passed.connect(func(): passes[0] += 1)
+	var bay: Dictionary = w.terrain.bays[0]
+	var x: float = bay.lip_x - 200.0
+	w.bird.position = Vector2(x, w.terrain.height_at(x))
+	w.bird.on_ground = true
+	w.bird.fever = true
+	w.bird.vel = Vector2(Bird.SPEED_MAX * 1.3, 0.0)
+	var t := 0.0
+	while t < 4.0 and not w.dead and w.bird.position.x < bay.bank_x + 600.0:
+		w._physics_process(DT)
+		t += DT
+	if w.dead:
+		return "died"
+	return "" if passes[0] == 1 else "passes=%d" % passes[0]
