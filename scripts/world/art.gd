@@ -474,6 +474,22 @@ static func villager(ci: CanvasItem, base: Vector2, s: float, col: Color) -> Vec
 	return hand
 
 
+static func level_star(ci: CanvasItem, c: Vector2, r: float, filled: bool) -> void:
+	# Bintang: a five-point star (the font has no star glyph), gold when earned, a dim outline when not.
+	var pts := PackedVector2Array()
+	for i in 10:
+		var a := -PI / 2.0 + i * PI / 5.0
+		pts.append(c + Vector2(cos(a), sin(a)) * (r if i % 2 == 0 else r * 0.45))
+	if filled:
+		ci.draw_colored_polygon(pts, Color("#ffd23f"))
+		pts.append(pts[0])
+		ci.draw_polyline(pts, Color("#b8860b"), maxf(2.0, r * 0.08), true)
+	else:
+		ci.draw_colored_polygon(pts, Color(1, 1, 1, 0.12))
+		pts.append(pts[0])
+		ci.draw_polyline(pts, Color(1, 1, 1, 0.45), maxf(2.0, r * 0.08), true)
+
+
 static func canopy_roof(ci: CanvasItem, edge: PackedVector2Array, top_y: float, dark: Color, leaf: Color, t: float) -> void:
 	# Hutan roof: a dark mass of branches down to `edge`, a bumpy fringe of leaves and a few short vines.
 	if edge.size() < 2:

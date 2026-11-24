@@ -173,3 +173,162 @@ func test_old_save_loads() -> String:
 	var got: Dictionary = Game.level_stars.duplicate()
 	Game.apply_save(keep)
 	return "" if got.is_empty() else "level_stars %s" % got
+
+
+# ---------------------------------------------------------------- level mode in game.gd (Task 3)
+
+func _level_game(id: String) -> Node:
+	Game.current_level = id
+	var g: Node = load("res://scenes/game.tscn").instantiate()
+	runner.add_child(g)
+	Game.current_level = ""
+	g._start()
+	return g
+
+
+func _has_text(n: Node, text: String) -> bool:
+	if (n is Label and (n as Label).text == text) or (n is Button and (n as Button).text == text):
+		return true
+	for c in n.get_children():
+		if _has_text(c, text):
+			return true
+	return false
+
+
+func _buttons(n: Node, out: Array = []) -> Array:
+	if n is Button:
+		out.append(n)
+	for c in n.get_children():
+		_buttons(c, out)
+	return out
+
+
+func _button_texts(n: Node) -> Array:
+	var out: Array = []
+	for b in _buttons(n):
+		out.append((b as Button).text)
+	return out
+
+
+func _frames(g: Node, seconds: float) -> void:
+	for i in int(seconds / DT):
+		g._physics_process(DT)
+		g.world._physics_process(DT)
+
+
+func test_level_finishes_at_gate() -> String:
+	var keep: Dictionary = Game.level_stars.duplicate()
+	var g := _level_game("sawah-1")
+	var w: World = g.world
+	w.autoplay = true
+	var t := 0.0
+	while t < 120.0 and g.state == "play":
+		g._physics_process(DT)
+		w._physics_process(DT)
+		t += DT
+	var r := ""
+	if g.state != "done":
+		r = "state %s at x=%.0f (gate %.0f)" % [g.state, w.bird.position.x, w.terrain.island_finish[0]]
+	elif w.bird.position.x < w.terrain.island_finish[0]:
+		r = "done before the gate"
+	elif not _has_text(g.result_panel, "Level selesai!"):
+		r = "no level done title"
+	Game.level_stars = keep
+	return r
+
+
+func test_level_stars_rules() -> String:
+	var g := _level_game("sawah-1")
+	g.level_coins_total = 10
+	var cases := [[5, false, 2], [6, false, 3], [6, true, 2], [0, true, 1], [10, false, 3]]
+	for c in cases:
+		g.level_coins = c[0]
+		g.continued = c[1]
+		if g.level_stars_earned() != c[2]:
+			return "coins %d continued %s: %d stars, want %d" % [c[0], c[1], g.level_stars_earned(), c[2]]
+	return ""
+
+
+func test_star_bonus_once() -> String:
+	var keep: Dictionary = Game.level_stars.duplicate()
+	var coins0 := Game.coins
+	Game.level_stars = {}
+	var gains: Array = []
+	for i in 2:
+		var g := _level_game("sawah-1")
+		g.level_coins_total = 10
+		g.level_coins = 0
+		var before := Game.coins
+		g._finish_level()
+		gains.append(Game.coins - before)
+	Game.level_stars = keep
+	Game.coins = coins0
+	return "" if gains == [2 * 20, 0] else "star bonus gains %s" % [gains]
+
+
+func test_level_lose_buttons() -> String:
+	var g := _level_game("sawah-1")
+	g.world.bird_died.emit("laut")
+	var texts := _button_texts(g.result_panel)
+	texts.sort()
+	return "" if texts == ["Lanjut (tonton iklan)", "Peta", "Ulangi"] else "buttons %s" % [texts]
+
+
+func test_level_done_buttons() -> String:
+	var keep: Dictionary = Game.level_stars.duplicate()
+	var g := _level_game("sawah-1")
+	g._finish_level()
+	var texts := _button_texts(g.result_panel)
+	texts.sort()
+	var r := ""
+	if texts != ["Lanjut", "Peta", "Ulangi"]:
+		r = "buttons %s" % [texts]
+	else:
+		var h := _level_game("hutan-3")
+		h._finish_level()
+		for b in _buttons(h.result_panel):
+			if (b as Button).text == "Lanjut" and not (b as Button).disabled:
+				r = "hutan-3: Lanjut enabled but gunung is not ready"
+	Game.level_stars = keep
+	return r
+
+
+func test_safe_after_gate() -> String:
+	var g := _level_game("sawah-1")
+	var w: World = g.world
+	var deaths: Array = []
+	w.bird_died.connect(func(c: String): deaths.append(c))
+	w.finished = true
+	var x := w.terrain.island_finish[0]
+	while not w.terrain.is_sea_at(x):
+		x += 10.0
+	w.bird.position = Vector2(x + 50.0, Terrain.WATER_Y + 10.0)
+	w.bird.on_ground = false
+	_frames(g, 1.0)
+	return "" if deaths.is_empty() else "died after the gate: %s" % [deaths]
+
+
+func test_level_no_record() -> String:
+	var keep: Dictionary = Game.level_stars.duplicate()
+	var best := Game.best_score
+	var runs := Game.total_runs
+	var g := _level_game("sawah-1")
+	g.distance = 999999
+	g._finish_level()
+	var h := _level_game("sawah-1")
+	h.distance = 999999
+	h.world.bird_died.emit("laut")
+	Game.level_stars = keep
+	if Game.best_score != best or Game.total_runs != runs:
+		return "level touched endless records: best %d -> %d, runs %d -> %d" % [best, Game.best_score, runs, Game.total_runs]
+	return ""
+
+
+func test_hud_level_coins() -> String:
+	var g := _level_game("sawah-1")
+	g._process(0.0)
+	var want := "0/%d" % g.level_coins_total
+	if g.level_coins_total < 10:
+		return "only %d level coins" % g.level_coins_total
+	var got: String = (g.coin_pill.get_node("H/Label") as Label).text
+	return "" if got == want else "coin label %s, want %s" % [got, want]

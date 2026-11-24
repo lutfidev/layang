@@ -32,6 +32,7 @@ var current_island := 0
 var input_enabled := true
 var hazards := true        # false in menu / shop demo worlds: the sea just bounces the bird
 var dead := false
+var finished := false      # adventure level past its gate: nothing can kill the bird any more
 var monster: SeaMonster
 var wave: Wave
 var kite: Kite
@@ -225,7 +226,7 @@ func _update_hazards(delta: float) -> void:
 			hit_island = h.CAUSE
 	var over_water := terrain.is_water_at(x)
 	var over_sea := terrain.is_sea_at(x)
-	if not hazards:
+	if not hazards or finished:
 		if over_water and bird.position.y > Terrain.WATER_Y - 30.0:
 			bird.vel.y = -Bird.MAX_RISE
 			bird.on_ground = false
