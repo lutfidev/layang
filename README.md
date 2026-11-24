@@ -6,7 +6,7 @@ Game arcade *one-touch* untuk Android (landscape) yang dibuat dengan Godot 4.7.2
 ---
 
 ## 1. Pitch
-Seekor burung kecil meluncur di atas bukit-bukit. **Tahan layar** = burung jadi berat dan menukik cepat di turunan. **Lepas** di tanjakan = burung melambung ke udara. Kamu harus sampai ke pulau berikutnya sebelum matahari terbenam. Setiap pulau baru menambah waktu dan menampilkan pemandangan baru.
+Seekor burung kecil terbang di atas bukit-bukit. **Tahan layar** = burung naik (menghabiskan stamina). **Lepas** = burung meluncur turun. Terbang rendah menyerempet bukit untuk combo, dan hati-hati di laut: tercebur atau digigit monster laut berarti run selesai. Kamu harus sampai ke pulau berikutnya sebelum matahari terbenam. Setiap pulau baru menambah waktu dan menampilkan pemandangan baru.
 
 * **Mudah dipahami dalam 3 detik, butuh waktu lama untuk mahir.** Formula ini sudah terbukti di Tiny Wings, Alto's Adventure, dan Hill Climb.
 * **Sesi pendek (1–3 menit)**, sehingga cocok dengan iklan berhadiah di akhir run.
@@ -15,11 +15,13 @@ Seekor burung kecil meluncur di atas bukit-bukit. **Tahan layar** = burung jadi 
 ## 2. Cara main
 | Input | Efek |
 |---|---|
-| Tahan layar / Spasi / ↓ | Menukik (gravitasi ×2,7) |
-| Lepas | Meluncur / melambung |
-| Mendarat sejajar turunan | **MULUS!** +kecepatan, +poin beruntun |
-| 3× MULUS beruntun | **FEVER**: koin ×2 + magnet koin |
-| Mendarat di tanjakan | **Aduh!** Kecepatan turun |
+| Tahan layar / Spasi / ↑ / W | Naik (stamina berkurang; habis = tidak bisa naik sampai terisi lagi) |
+| Lepas | Meluncur turun, stamina terisi (lebih cepat di tanah) |
+| Terbang rendah di atas bukit ≥ 0,6 dtk | **NYEREMPET!** +poin beruntun |
+| 3× NYEREMPET beruntun | **FEVER**: koin ×2 + magnet koin |
+| Menyentuh tanah | Combo reset; jatuh keras / tanjakan curam = **Aduh!** kecepatan turun |
+| Menyentuh air laut | Run selesai (**Tercebur ke laut!**) |
+| Monster laut (gelembung = peringatan ~1 dtk) | Terbang tinggi! Kena gigit = run selesai |
 | Bintang matahari | +3 detik |
 | Pulau baru | +6 s/d +17 detik, +20 koin, +500 poin |
 | Waktu habis | Burung mengantuk, lalu run selesai (bisa lanjut lewat iklan) |
@@ -52,7 +54,7 @@ Semua pemanggilan iklan/IAP lewat `scripts/autoload/ads.gd`. Untuk go-live, gant
 ## 5. Menjalankan
 1. Install **Godot 4.7.x** (dites dengan 4.7.2).
 2. Godot, lalu *Import*, lalu pilih `project.godot`, lalu ▶ (F5).
-3. Di PC: klik mouse / Spasi = tahan. Esc = jeda.
+3. Di PC: klik mouse / Spasi / ↑ / W = tahan. Esc = jeda.
 
 ### Flag dev (untuk testing)
 Jalankan dari terminal: `godot --path . res://scenes/game.tscn -- --island=3 --autoplay --time=10`

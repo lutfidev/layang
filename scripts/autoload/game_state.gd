@@ -44,14 +44,12 @@ func _ready() -> void:
 # ---------------------------------------------------------------- input
 
 func _setup_input() -> void:
-	if not InputMap.has_action("dive"):
-		InputMap.add_action("dive")
-		var k := InputEventKey.new()
-		k.physical_keycode = KEY_SPACE
-		InputMap.action_add_event("dive", k)
-		var k2 := InputEventKey.new()
-		k2.physical_keycode = KEY_DOWN
-		InputMap.action_add_event("dive", k2)
+	if not InputMap.has_action("fly"):
+		InputMap.add_action("fly")
+		for key in [KEY_SPACE, KEY_UP, KEY_W]:
+			var k := InputEventKey.new()
+			k.physical_keycode = key
+			InputMap.action_add_event("fly", k)
 	if not InputMap.has_action("pause"):
 		InputMap.add_action("pause")
 		var p := InputEventKey.new()
@@ -158,6 +156,8 @@ func toggle_music() -> void:
 # ---------------------------------------------------------------- save / load
 
 func save_game() -> void:
+	if dev.has("nosave"):   # tests / balance sims must not touch the player's save
+		return
 	var data := {
 		"coins": coins, "best_score": best_score, "best_distance": best_distance,
 		"best_island": best_island, "total_runs": total_runs,

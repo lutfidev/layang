@@ -41,6 +41,12 @@ func _draw() -> void:
 		_draw_layer(lb[i], blend, size)
 
 
+func _haze_color() -> Color:
+	var a: Color = biome_a.get("sky_horizon", biome_b.sky_horizon)
+	var b: Color = biome_b.sky_horizon
+	return a.lerp(b, blend) * tint
+
+
 func _profile(L: Dictionary, u: float, base_y: float) -> float:
 	var n := _noise(int(L.seed))
 	var amp: float = L.amp
@@ -80,7 +86,19 @@ func _draw_layer(L: Dictionary, alpha: float, size: Vector2) -> void:
 	var edge := pts.duplicate()
 	pts.append(Vector2(size.x + 24.0, size.y + 10.0))
 	pts.append(Vector2(-24.0, size.y + 10.0))
-	draw_colored_polygon(pts, col)
+	# atmospheric perspective: far layers (low factor) melt into the horizon, bases are misty
+	var haze := _haze_color()
+	haze.a = alpha
+	var far := clampf(1.0 - float(L.factor) / 0.35, 0.0, 1.0)
+	var top_col := col.lerp(haze, 0.05 + 0.15 * far)
+	var bottom_col := col.lerp(haze, 0.22 + 0.2 * far)
+	var cols := PackedColorArray()
+	var span := maxf(1.0, size.y + 10.0 - (base_y - float(L.amp)))
+	for p in pts:
+		var k := clampf((p.y - (base_y - float(L.amp))) / span, 0.0, 1.0)
+		cols.append(top_col.lerp(bottom_col, k * k))
+	draw_polygon(pts, cols)
+	col = top_col
 	var hi := col.lightened(0.18)
 	hi.a = alpha * 0.6
 	draw_polyline(edge, hi, 2.0, true)

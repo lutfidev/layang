@@ -74,6 +74,10 @@ func height_at(x: float) -> float:
 	return keys_y[i] + (keys_y[i + 1] - keys_y[i]) * (1.0 - cos(PI * t)) * 0.5
 
 
+func is_sea_at(x: float) -> bool:
+	return height_at(x) > WATER_Y
+
+
 func slope_at(x: float) -> float:
 	if keys_x.is_empty() or x <= keys_x[0]:
 		return 0.0
@@ -128,7 +132,7 @@ func _generate_island() -> void:
 	var diff := float(min(k + start_island * 0.5, 10))
 	var amp := 1.0 + diff * 0.07
 	var wid := 1.0 + diff * 0.035
-	var hills := 15 + int(min(k, 6)) * 2
+	var hills := 9 + int(min(k, 6))
 	var biome: Dictionary = Biomes.get_biome(start_island + k)
 
 	if k == 0:
@@ -159,11 +163,13 @@ func _generate_island() -> void:
 	island_finish.append(fx)
 	props.append({"x": fx, "kind": "gapura", "island": k, "s": 1.0})
 
-	# sea
+	# sea: gets wider further into the run (room for more sea-monster jumps)
 	var sea_x := fx + 1200.0
-	_add_key(Vector2(sea_x, SEA_FLOOR), k + 1)
-	boundaries.append(sea_x)
-	_build_water(fx, sea_x + 1100.0, biome)
+	var sea_len := 500.0 + minf(k + start_island, 6.0) * 320.0
+	_add_key(Vector2(sea_x, SEA_FLOOR), k)
+	_add_key(Vector2(sea_x + sea_len, SEA_FLOOR), k + 1)
+	boundaries.append(sea_x + sea_len * 0.5)
+	_build_water(fx, sea_x + sea_len + 1100.0, biome)
 
 	_place_items(k, hill_start_key, keys_x.size() - 3, rng, biome)
 	_islands_generated += 1
@@ -212,6 +218,7 @@ func _material_for(island: int) -> ShaderMaterial:
 	m.set_shader_parameter("col_top", b.hill_top)
 	m.set_shader_parameter("col_deep", b.hill_deep)
 	m.set_shader_parameter("pattern", int(b.pattern))
+	m.set_shader_parameter("light_x", (float(b.sun_x) - 0.5) * 1.6)
 	m.set_shader_parameter("stripe_w", float(b.stripe_w))
 	m.set_shader_parameter("glow_rim", 1.0 if b.id == "danau" or b.id == "gunung" else 0.0)
 	_materials[island] = m
@@ -226,6 +233,7 @@ func _build_segment(idx: int) -> void:
 	var n := int(ceil((x1 - x0) / SAMPLE))
 	var verts := PackedVector2Array()
 	var uvs := PackedVector2Array()
+	var cols := PackedColorArray()
 	for j in n + 1:
 		var x := lerpf(x0, x1, float(j) / n)
 		var t := float(j) / n
@@ -234,10 +242,16 @@ func _build_segment(idx: int) -> void:
 		uvs.append(Vector2(x, 0.0))
 		verts.append(Vector2(x, h + DEPTH))
 		uvs.append(Vector2(x, DEPTH))
+		# surface slope packed into the vertex color (red = 0.5 + slope * 0.4) for hill.gdshader lighting
+		var s := (keys_y[idx + 1] - keys_y[idx]) * PI * sin(PI * t) / (2.0 * (x1 - x0))
+		var c := Color(clampf(0.5 + s * 0.4, 0.0, 1.0), 0, 0, 1)
+		cols.append(c)
+		cols.append(c)
 	var arr := []
 	arr.resize(Mesh.ARRAY_MAX)
 	arr[Mesh.ARRAY_VERTEX] = verts
 	arr[Mesh.ARRAY_TEX_UV] = uvs
+	arr[Mesh.ARRAY_COLOR] = cols
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLE_STRIP, arr)
 	var mi := MeshInstance2D.new()

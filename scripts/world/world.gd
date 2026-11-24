@@ -5,8 +5,10 @@ extends Node2D
 
 signal island_reached(k: int, biome: Dictionary)
 signal item_collected(kind: int, pos: Vector2)
-signal bird_landed(quality: int)
+signal bird_landed(bonk: bool)
 signal bird_splashed
+signal bird_died(cause: String)        # "laut" | "monster"
+signal bird_skimmed(duration: float)
 
 var autoplay := false
 var running := true
@@ -24,6 +26,9 @@ var backdrop: Backdrop
 var ambient: Ambient
 var current_island := 0
 var input_enabled := true
+var hazards := true        # false in menu / shop demo worlds: the sea just bounces the bird
+var dead := false
+var monster: SeaMonster
 
 var _sky_mat: ShaderMaterial
 var _sky_rect: ColorRect
@@ -34,6 +39,11 @@ var _blend := 1.0
 var _zoom := 1.0
 var _touch_hold := false
 var _dusk := 0.0
+var _in_sea := false
+var _jumps_left := 0
+var _jump_cd := 0.0
+var _ai_rng: RandomNumberGenerator
+var _ai_react := -1.0
 
 
 func _ready() -> void:
@@ -69,6 +79,11 @@ func _ready() -> void:
 	bird.terrain = terrain
 	bird.position = Vector2(-880, terrain.height_at(-880))
 	add_child(bird)
+	monster = SeaMonster.new()
+	add_child(monster)
+	var shade := BirdShadow.new()
+	shade.world = self
+	add_child(shade)
 	camera = Camera2D.new()
 	add_child(camera)
 	camera.make_current()
@@ -82,6 +97,7 @@ func _ready() -> void:
 	coins.collected.connect(func(kind, pos): item_collected.emit(kind, pos))
 	bird.landed.connect(_on_landed)
 	bird.splashed.connect(_on_splash)
+	bird.skimmed.connect(func(d: float): bird_skimmed.emit(d))
 
 	_biome_to = Biomes.get_biome(start_island)
 	_biome_from = _biome_to
@@ -114,13 +130,16 @@ func release_input() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if not running:
+	if not running or dead:
 		return
 	if autoplay:
 		bird.holding = _ai_hold()
 	else:
-		bird.holding = input_enabled and (_touch_hold or Input.is_action_pressed("dive"))
+		bird.holding = input_enabled and (_touch_hold or Input.is_action_pressed("fly"))
 	bird.step(delta)
+	_update_hazards(delta)
+	if dead:
+		return
 	coins.check(bird.center(), 48.0, 230.0 if bird.fever else 0.0, delta)
 	var k := terrain.island_at(bird.position.x)
 	if k > current_island:
@@ -129,15 +148,79 @@ func _physics_process(delta: float) -> void:
 		island_reached.emit(k, _biome_to)
 
 
-func _ai_hold() -> bool:
+func _update_hazards(delta: float) -> void:
 	var x := bird.position.x
-	var look := x + clampf(bird.vel.x * 0.07, 20.0, 150.0)
-	var s := terrain.slope_at(look)
-	if bird.on_ground:
-		return s > 0.0
-	var h := terrain.height_at(look)
-	var height_above := h - bird.position.y
-	return s > 0.04 and bird.vel.y > -80.0 and height_above < 900.0
+	var over_sea := terrain.is_sea_at(x)
+	if not hazards:
+		if over_sea and bird.position.y > Terrain.WATER_Y - 30.0:
+			bird.vel.y = -Bird.MAX_RISE
+			bird.on_ground = false
+		return
+	if over_sea and not _in_sea:
+		_jumps_left = monster.jumps_for_island(start_island + terrain.island_at(x))
+		_jump_cd = 0.0
+	_in_sea = over_sea
+	_jump_cd -= delta
+	if over_sea and _jumps_left > 0 and _jump_cd <= 0.0 and monster.state == "idle":
+		var warn := SeaMonster.FIRST_WARN_TIME if terrain.island_at(x) == 0 else SeaMonster.WARN_TIME
+		var half := SeaMonster.SPAN * 0.5
+		var sea_end := x
+		while terrain.is_sea_at(sea_end + 20.0) and sea_end < x + 8000.0:
+			sea_end += 20.0
+		# aim where the bird will be, but keep the whole arc over the water
+		var tx := minf(x + bird.vel.x * (warn + 0.55), sea_end - half)
+		if tx - half > x + 60.0:
+			monster.arm(tx, warn)
+			_jumps_left -= 1
+			_jump_cd = warn + SeaMonster.JUMP_TIME + 0.5
+	if monster.update(delta, bird.center()):
+		_die("monster")
+	elif over_sea and bird.center().y > Terrain.WATER_Y:
+		_die("laut")
+
+
+func _die(cause: String) -> void:
+	dead = true
+	if cause == "monster":
+		shake = 1.2
+		Sfx.play("chomp")
+		Ambient.burst(self, bird.center(), Color("#ffffff"), 22, 520.0)
+	bird_died.emit(cause)
+
+
+## Removes any active sea monster and its remaining jumps for this sea (used by "Lanjut terbang").
+func clear_hazards() -> void:
+	monster.reset()
+	_jumps_left = 0
+	_jump_cd = 0.0
+
+
+## Autopilot (menu, shop, balance sim): skims ~70 px over the hills, cruises over the sea,
+## and climbs out of reach when the sea monster warns, after a seeded, sometimes slow reaction.
+func _ai_hold() -> bool:
+	if _ai_rng == null:
+		_ai_rng = RandomNumberGenerator.new()
+		_ai_rng.seed = run_seed * 31 + 7
+	var b := bird
+	var x := b.position.x
+	var vx := maxf(b.vel.x, 200.0)
+	var target: float
+	if terrain.is_sea_at(x) or terrain.is_sea_at(x + vx * 0.6):
+		target = Terrain.WATER_Y - 450.0
+		if monster.state == "warn" and _ai_react < 0.0:
+			_ai_react = 0.15 + pow(_ai_rng.randf(), 4.0) * 1.2
+		if monster.state == "idle":
+			_ai_react = -1.0
+		var reacting := monster.state == "jump" or (monster.state == "warn" and monster.t >= _ai_react)
+		if reacting and monster.target_x + SeaMonster.SPAN > x:
+			target = Terrain.WATER_Y - SeaMonster.PEAK_ABOVE_WATER - 140.0
+	else:
+		var top := terrain.height_at(x)
+		for i in range(1, 7):
+			top = minf(top, terrain.height_at(x + vx * 0.12 * i))
+		target = minf(top, Terrain.WATER_Y) - 70.0
+	var predicted := b.position.y + b.vel.y * 0.2
+	return predicted > target
 
 
 func _change_biome(b: Dictionary) -> void:
@@ -208,14 +291,37 @@ func _update_sky() -> void:
 	backdrop.tint = Color.WHITE.lerp(Color(0.55, 0.45, 0.72), _dusk * 0.7)
 
 
-func _on_landed(q: int) -> void:
-	if q == 0:
+func _on_landed(bonk: bool) -> void:
+	if bonk:
 		shake = 0.8
-	elif q == 2:
-		Ambient.burst(self, bird.position, _biome_to.hill_top, 18, 420.0)
-	bird_landed.emit(q)
+	bird_landed.emit(bonk)
 
 
 func _on_splash() -> void:
 	Ambient.burst(self, Vector2(bird.position.x, Terrain.WATER_Y), (_biome_to.water_top as Color), 26, 620.0)
 	bird_splashed.emit()
+
+
+
+## Soft shadow under the bird on the ground or the water: smaller and darker the closer it flies.
+class BirdShadow:
+	extends Node2D
+	var world: World
+
+	func _ready() -> void:
+		z_index = 1
+
+	func _process(_d: float) -> void:
+		queue_redraw()
+
+	func _draw() -> void:
+		var b := world.bird
+		var x := b.position.x
+		var sea := world.terrain.is_sea_at(x)
+		var gy := Terrain.WATER_Y + 2.0 if sea else world.terrain.height_at(x)
+		var h := gy - b.position.y
+		if h > 900.0 or h < -4.0:
+			return
+		var k := clampf(h / 900.0, 0.0, 1.0)
+		var rot := 0.0 if sea else atan(world.terrain.slope_at(x))
+		Art.shadow(self, Vector2(x, gy + 2.0), 34.0 * (1.0 + k * 0.8), 8.0 * (1.0 + k * 0.4), 0.55 * (1.0 - k), rot)

@@ -195,3 +195,59 @@ static func coin(ci: CanvasItem, c: Vector2, r: float, t: float) -> void:
 	ellipse(ci, c, r * 0.72 * squash, r * 0.72, Color("#ffe58a"))
 	var hw := r * 0.24 * squash
 	ci.draw_rect(Rect2(c - Vector2(hw, r * 0.24), Vector2(hw * 2, r * 0.48)), Color("#c7861a"))
+
+
+## Original chubby sea serpent head facing left: big eyes, big teeth, rounded fin crest.
+## `mouth_open` 0..1 opens the jaw.
+static func sea_monster(ci: CanvasItem, pos: Vector2, s: float, body: Color, belly: Color, mouth_open: float, t: float) -> void:
+	var r := 58.0 * s
+	var wob := sin(t * 9.0) * 2.0 * s
+	# fin crest
+	for i in 3:
+		var fx := pos.x + (6.0 + i * 20.0) * s
+		var fy := pos.y - r * 0.82 + i * 7.0 * s
+		ci.draw_colored_polygon(PackedVector2Array([Vector2(fx - 13.0 * s, fy + 8.0 * s), Vector2(fx + 4.0 * s, fy - 26.0 * s + wob), Vector2(fx + 15.0 * s, fy + 10.0 * s)]), body.lightened(0.25))
+	ellipse(ci, pos, r * 1.05, r, body.darkened(0.22))
+	ellipse(ci, pos + Vector2(0, -r * 0.08), r * 0.95, r * 0.9, body)
+	ellipse(ci, pos + Vector2(r * 0.1, -r * 0.55), r * 0.4, r * 0.18, Color(1, 1, 1, 0.2), 0.2)
+	# mouth: dark wedge opening from a hinge at the cheek
+	var open := mouth_open * 0.8
+	var hinge := pos + Vector2(r * 0.25, r * 0.15)
+	var up_dir := Vector2(-1, 0).rotated(-open * 0.5)
+	var lo_dir := Vector2(-1, 0).rotated(open)
+	var tip_up := hinge + up_dir * r * 1.35
+	var tip_lo := hinge + lo_dir * r * 1.25
+	ci.draw_colored_polygon(PackedVector2Array([hinge, tip_up, tip_lo]), Color("#5a1030"))
+	# lower jaw
+	ci.draw_colored_polygon(PackedVector2Array([hinge + Vector2(10.0 * s, 0), tip_lo, tip_lo + Vector2(r * 0.2, r * 0.32).rotated(open), hinge + Vector2(r * 0.3, r * 0.55)]), belly)
+	# big teeth: upper row points down, lower row points up
+	var up_n := up_dir.orthogonal()        # points "down" relative to the upper jaw
+	var lo_n := -lo_dir.orthogonal()
+	for i in 3:
+		var u := 0.38 + i * 0.22
+		var a := hinge + up_dir * r * 1.35 * u
+		ci.draw_colored_polygon(PackedVector2Array([a - up_dir * 10.0 * s, a + up_n * -24.0 * s, a + up_dir * 10.0 * s]), Color.WHITE)
+		var b := hinge + lo_dir * r * 1.25 * u
+		ci.draw_colored_polygon(PackedVector2Array([b - lo_dir * 9.0 * s, b + lo_n * -18.0 * s, b + lo_dir * 9.0 * s]), Color.WHITE)
+	# eye with angry brow, nostril, blush
+	ci.draw_circle(pos + Vector2(-r * 0.95, -r * 0.2), 3.5 * s, body.darkened(0.45))
+	var eye := pos + Vector2(-r * 0.15, -r * 0.42)
+	ci.draw_circle(eye, 20.0 * s, Color.WHITE)
+	ci.draw_circle(eye + Vector2(-5.0 * s, 2.0 * s), 11.0 * s, Color("#1b1430"))
+	ci.draw_circle(eye + Vector2(-8.0 * s, -3.0 * s), 4.0 * s, Color.WHITE)
+	ci.draw_line(eye + Vector2(-20.0 * s, -24.0 * s), eye + Vector2(12.0 * s, -16.0 * s), body.darkened(0.5), 6.0 * s)
+	ci.draw_circle(pos + Vector2(r * 0.3, -r * 0.05), 9.0 * s, Color(1.0, 0.45, 0.6, 0.45))
+
+
+## A circle shaded like a ball lit from above: darker rim at the bottom, soft highlight on top.
+static func ball(ci: CanvasItem, c: Vector2, r: float, col: Color) -> void:
+	ci.draw_circle(c, r, col.darkened(0.22))
+	ci.draw_circle(c + Vector2(0, -r * 0.08), r * 0.9, col)
+	ellipse(ci, c + Vector2(-r * 0.2, -r * 0.45), r * 0.42, r * 0.22, Color(1, 1, 1, 0.22), -0.3)
+
+
+## Soft ground shadow: a few stacked translucent ellipses.
+static func shadow(ci: CanvasItem, c: Vector2, rx: float, ry: float, alpha: float, rot: float = 0.0) -> void:
+	for i in 3:
+		var k := 1.0 - i * 0.28
+		ellipse(ci, c, rx * k, ry * k, Color(0.05, 0.02, 0.12, alpha * 0.4), rot)
