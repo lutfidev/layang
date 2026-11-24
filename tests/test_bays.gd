@@ -88,6 +88,33 @@ func test_no_ground_coins_or_props_in_bay() -> String:
 	return ""
 
 
+func test_no_coins_inside_wave() -> String:
+	for s in SEEDS:
+		for first in [0, 1]:
+			var w := _world(s, first)
+			for it in w.coins.items:
+				var p: Vector2 = it[0]
+				if w.terrain.in_wave_shape(p, 0.0):
+					return "seed %d start %d: coin inside the wave at %s" % [s, first, p]
+			_free(w)
+	return ""
+
+
+func test_tube_has_guide_coins() -> String:
+	for s in SEEDS:
+		var w := _world(s)
+		for b in w.terrain.bays:
+			var n := 0
+			for it in w.coins.items:
+				var p: Vector2 = it[0]
+				if is_equal_approx(p.y, Terrain.TUBE_COIN_Y) and p.x >= float(b.water_x0) - 21.0 and p.x <= float(b.water_x1) + 21.0:
+					n += 1
+			if n != Terrain.TUBE_COINS:
+				return "seed %d bay at %.0f: %d tube coins" % [s, b.mid, n]
+		_free(w)
+	return ""
+
+
 # ---------------------------------------------------------------- bay shape
 
 func _bird_on(w: World, x: float, ground: bool, y: float = 0.0) -> Bird:
@@ -376,7 +403,7 @@ func test_continue_far_from_bay_keeps_next_wave() -> String:
 	var passes := [0]
 	w.wave_passed.connect(func(): passes[0] += 1)
 	var t := 0.0
-	while t < 6.0 and not w.dead and w.bird.position.x < bay.bank_x:
+	while t < 6.0 and not w.dead and w.bird.position.x < bay.bank_x + 300.0:
 		_pilot_step(w)
 		t += DT
 		rose[0] = rose[0] or (w.wave.state == "rise" and w.wave.bay == 0)

@@ -13,7 +13,10 @@ const FOAM_DIST := 3200.0      # foam starts when mid - bird_x drops below this
 const RISE_DIST := 2600.0      # the wall starts rising here
 const FULL_DIST := 1500.0      # and stands at full height from here on
 const RISE_SPEED := 2600.0     # max change of height per second (no popping between close bays)
-const PASS_MARGIN := 40.0      # past col_x1 + this = passed
+const MAX_OVER := 900.0        # how far the face leans out over the approach at the crest
+const LEDGE := 140.0           # the back slope ends this far past the tube's exit, at the roof
+const CREST_W := 300.0         # width of the wall at the crest
+const PASS_MARGIN := 40.0      # past col_x1 + LEDGE + this = passed
 const RECEDE_TIME := 0.9
 const FULL_H := Terrain.WATER_Y - CREST_Y
 
@@ -52,6 +55,23 @@ func crest_y() -> float:
 	return Terrain.WATER_Y - height
 
 
+## The wave's shape (shared by the hit test and the drawing, so what looks deadly is deadly).
+## Above the tube's roof the face leans out over the approach the higher it gets and the back slopes
+## down to a short ledge past the exit; below the roof the column is the tube itself.
+static func face_x(x0: float, y: float, crest: float) -> float:
+	if y >= TUBE_TOP or crest >= TUBE_TOP:
+		return x0
+	var over := minf(MAX_OVER, (Terrain.WATER_Y - crest) * 0.45)
+	return x0 - over * pow(clampf((TUBE_TOP - y) / (TUBE_TOP - crest), 0.0, 1.0), 1.3)
+
+
+static func back_x(x0: float, x1: float, y: float, crest: float) -> float:
+	if y >= TUBE_TOP or crest >= TUBE_TOP:
+		return x1
+	var s := clampf((TUBE_TOP - y) / (TUBE_TOP - crest), 0.0, 1.0)
+	return lerpf(x1 + LEDGE, face_x(x0, crest, crest) + CREST_W, pow(s, 0.7))
+
+
 ## Advances the wave; returns true when it hits the bird.
 func update(delta: float, bird_center: Vector2, bird_x: float) -> bool:
 	_anim += delta
@@ -74,7 +94,7 @@ func update(delta: float, bird_center: Vector2, bird_x: float) -> bool:
 			return false
 	var b: Dictionary = terrain.bays[bay]
 	_d = float(b.mid) - bird_x
-	if bird_x > col_x1() + PASS_MARGIN:
+	if bird_x > col_x1() + LEDGE + PASS_MARGIN:
 		_finish(true)
 		return false
 	var target := 0.0
@@ -93,14 +113,26 @@ func update(delta: float, bird_center: Vector2, bird_x: float) -> bool:
 	return hits(bird_center)
 
 
-## True when a bird centered at c touches the wave: anywhere in the column from the crest down to the
-## tube's roof. The tube under the roof is always safe, even while the wave is still rising.
+## True when a bird centered at c touches the wall: its shape from the crest down to the tube's roof.
+## The tube under the roof is always safe, even while the wave is still rising.
 func hits(c: Vector2) -> bool:
 	if bay < 0 or height <= 0.0:
 		return false
-	if c.x < col_x0() - HIT_PAD or c.x > col_x1() + HIT_PAD:
+	var crest := crest_y()
+	if c.y - HIT_PAD >= TUBE_TOP or c.y + HIT_PAD <= crest:
 		return false
-	return c.y - HIT_PAD < TUBE_TOP and c.y + HIT_PAD > crest_y()
+	var y := clampf(c.y, crest, TUBE_TOP - 1.0)
+	var y_top := clampf(c.y - HIT_PAD, crest, TUBE_TOP - 1.0)
+	# the face leans out higher up, so test the bird's top against it
+	return c.x + HIT_PAD > face_x(col_x0(), y_top, crest) and c.x - HIT_PAD < back_x(col_x0(), col_x1(), y, crest)
+
+
+## Where a respawn after x may go: past this wave's back ledge while it is standing (a bird killed by
+## the overhang dies before the bay, and must not come back in front of it).
+func safe_x_after(x: float) -> float:
+	if bay >= 0 and state == "rise":
+		return maxf(x, col_x1() + LEDGE + PASS_MARGIN)
+	return x
 
 
 ## Lets the current bay's wave go without counting it as passed (used by "Lanjut terbang").

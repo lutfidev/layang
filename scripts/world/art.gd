@@ -266,20 +266,6 @@ static func foam(ci: CanvasItem, x0: float, x1: float, y: float, density: float,
 	ci.draw_line(Vector2(x0, y + 1.0), Vector2(x1, y + 1.0), Color(1, 1, 1, 0.5 + 0.4 * density), 5.0)
 
 
-## Left (face) edge of the curling wall at height y: straight above the tube mouth, then leaning
-## further out over the bird's side the higher it gets (the overhang under the curl).
-static func _wave_left(x0: float, y: float, crest_y: float, tube_top: float, over: float) -> float:
-	if y >= tube_top or crest_y >= tube_top - 1.0:
-		return x0
-	return x0 - over * pow((tube_top - y) / (tube_top - crest_y), 1.7)
-
-
-## Back edge of the wall: narrow at the crest, at x1 by the water (never past the hit column).
-static func _wave_right(x0: float, x1: float, y: float, crest_y: float, water_y: float) -> float:
-	var s := clampf((y - crest_y) / maxf(1.0, water_y - crest_y), 0.0, 1.0)
-	return lerpf(x1 - (x1 - x0) * 0.3, x1, sqrt(s))
-
-
 ## Body colour at relative depth s (0 = crest, 1 = water line): bright and see-through at the top,
 ## deep and dark at the foot, so the wall reads as a thick, round mass of water.
 static func _wave_col(s: float, water: Color, water_top: Color) -> Color:
@@ -293,40 +279,57 @@ static func _wave_col(s: float, water: Color, water_top: Color) -> Color:
 ## the dark tube under the curl (mouth rim on the left, light at the far end) and foam at its foot.
 static func wave_wall(ci: CanvasItem, x0: float, x1: float, water_y: float, crest_y: float, tube_top: float, water: Color, water_top: Color, t: float) -> void:
 	var h := water_y - crest_y
-	var over := minf(220.0, h * 0.12)
 	var formed := crest_y < tube_top - 40.0
 	var bands := 30
 	# depth: the same wall further away (up and to the right), paler, only above the tube's roof
 	if formed:
 		var off := Vector2(80.0, -70.0)
-		var far := water_top.lerp(Color(0.92, 0.97, 1.0), 0.45)
+		var far := water_top.lerp(Color(0.92, 0.97, 1.0), 0.6)
 		for k in bands:
 			var ya := lerpf(crest_y, tube_top, float(k) / bands)
 			var yb := lerpf(crest_y, tube_top, float(k + 1) / bands)
 			var pts := PackedVector2Array([
-				Vector2(_wave_left(x0, ya, crest_y, tube_top, over), ya) + off,
-				Vector2(_wave_right(x0, x1, ya, crest_y, water_y), ya) + off,
-				Vector2(_wave_right(x0, x1, yb, crest_y, water_y), yb) + off,
-				Vector2(_wave_left(x0, yb, crest_y, tube_top, over), yb) + off])
-			ci.draw_colored_polygon(pts, Color(far, 0.55 - 0.3 * float(k) / bands))
+				Vector2(Wave.face_x(x0, ya, crest_y), ya) + off,
+				Vector2(Wave.back_x(x0, x1, ya, crest_y), ya) + off,
+				Vector2(Wave.back_x(x0, x1, yb, crest_y), yb) + off,
+				Vector2(Wave.face_x(x0, yb, crest_y), yb) + off])
+			ci.draw_colored_polygon(pts, Color(far, 0.35 - 0.2 * float(k) / bands))
 	shadow(ci, Vector2((x0 + x1) * 0.5, water_y + 8.0), (x1 - x0) * 0.9, 14.0, 0.4)
-	# the wall, band by band with a vertical gradient
-	for k in bands:
-		var ya := lerpf(crest_y, water_y + 6.0, float(k) / bands)
-		var yb := lerpf(crest_y, water_y + 6.0, float(k + 1) / bands)
-		var ca := _wave_col(float(k) / bands, water, water_top)
-		var cb := _wave_col(float(k + 1) / bands, water, water_top)
+	# the wall, band by band with a vertical gradient; the bands break exactly at the tube's roof,
+	# where the back's ledge steps in to the tube's exit
+	var ys: Array[float] = []
+	var roof := tube_top if formed else crest_y
+	for k in bands + 1:
+		ys.append(lerpf(crest_y, roof, float(k) / bands))
+	for k in range(1, 7):
+		ys.append(lerpf(roof, water_y + 6.0, float(k) / 6.0))
+	for k in ys.size() - 1:
+		var ya: float = ys[k]
+		var yb: float = ys[k + 1] - 0.01 if k + 1 == bands and formed else ys[k + 1]
+		if yb <= ya:
+			continue
+		var ca := _wave_col((ya - crest_y) / h, water, water_top)
+		var cb := _wave_col((yb - crest_y) / h, water, water_top)
 		ci.draw_polygon(PackedVector2Array([
-			Vector2(_wave_left(x0, ya, crest_y, tube_top, over), ya),
-			Vector2(_wave_right(x0, x1, ya, crest_y, water_y), ya),
-			Vector2(_wave_right(x0, x1, yb, crest_y, water_y), yb),
-			Vector2(_wave_left(x0, yb, crest_y, tube_top, over), yb)]),
+			Vector2(Wave.face_x(x0, ya, crest_y), ya),
+			Vector2(Wave.back_x(x0, x1, ya, crest_y), ya),
+			Vector2(Wave.back_x(x0, x1, yb, crest_y), yb),
+			Vector2(Wave.face_x(x0, yb, crest_y), yb)]),
 			PackedColorArray([ca, ca, cb, cb]))
+	# light shining through the thin face near its edge: a bright rim that makes the wall read as round
+	if formed:
+		var rim_face := PackedVector2Array()
+		for k in 25:
+			var y := lerpf(tube_top, crest_y + h * 0.04, float(k) / 24.0)
+			rim_face.append(Vector2(Wave.face_x(x0, y, crest_y) + 7.0, y))
+		ci.draw_polyline(rim_face, Color(water_top.lerp(Color.WHITE, 0.35), 0.75), 12.0, true)
 	# shading on the back: the wall is round, so its far side turns away from the light
-	for k in 4:
-		var y := lerpf(crest_y + h * 0.1, water_y - 20.0, float(k) / 4.0)
-		var xr := _wave_right(x0, x1, y, crest_y, water_y)
-		ci.draw_line(Vector2(xr - 10.0 - k * 2.0, y), Vector2(xr - 10.0 - k * 2.0, y + h * 0.2), Color(0, 0, 0.1, 0.06), 18.0)
+	if formed:
+		var back := PackedVector2Array()
+		for k in 25:
+			var y := lerpf(crest_y + h * 0.03, tube_top - 2.0, float(k) / 24.0)
+			back.append(Vector2(Wave.back_x(x0, x1, y, crest_y) - 14.0, y))
+		ci.draw_polyline(back, Color(0, 0.05, 0.15, 0.12), 26.0, true)
 	# highlights that run up the face, following its lean
 	if formed:
 		for k in 6:
@@ -337,12 +340,12 @@ static func wave_wall(ci: CanvasItem, x0: float, x1: float, water_y: float, cres
 				var y := yc - 70.0 + j * 17.5
 				if y > tube_top - 10.0 or y < crest_y + 20.0:
 					continue
-				line.append(Vector2(_wave_left(x0, y, crest_y, tube_top, over) + 14.0 + k * 19.0, y))
+				line.append(Vector2(Wave.face_x(x0, y, crest_y) + 14.0 + k * 19.0, y))
 			if line.size() >= 2:
 				ci.draw_polyline(line, Color(1, 1, 1, 0.3 * sin(PI * u)), 4.0, true)
 	# the curl at the crest: a solid hook of water with a hollow and a foam rim, hanging towards the bird
-	var r := clampf(h * 0.07, 16.0, 110.0)
-	var cc := Vector2(_wave_left(x0, crest_y, crest_y, tube_top, over) + r * 0.9, crest_y + r)
+	var r := clampf(h * 0.1, 16.0, 200.0)
+	var cc := Vector2(Wave.face_x(x0, crest_y, crest_y) + r * 0.9, crest_y + r)
 	ellipse(ci, cc, r * 1.05, r, water_top.lerp(Color.WHITE, 0.1))
 	ellipse(ci, cc + Vector2(r * 0.15, r * 0.1), r * 0.55, r * 0.5, water.darkened(0.3))
 	for i in 14:
@@ -351,7 +354,7 @@ static func wave_wall(ci: CanvasItem, x0: float, x1: float, water_y: float, cres
 		ci.draw_circle(p, r * (0.24 - i * 0.008) + sin(t * 6.0 + i) * 1.5, Color.WHITE)
 	# foam cap along the crest line
 	var xa := cc.x
-	var xb := _wave_right(x0, x1, crest_y, crest_y, water_y)
+	var xb := Wave.back_x(x0, x1, crest_y, crest_y)
 	for i in 8:
 		var u := float(i) / 7.0
 		ci.draw_circle(Vector2(lerpf(xa, xb, u), crest_y + 4.0 + sin(t * 5.0 + i) * 2.0), r * 0.22 * (1.0 - u * 0.5), Color(1, 1, 1, 0.9))
@@ -406,7 +409,7 @@ static func wave_lip(ci: CanvasItem, x0: float, x1: float, water_y: float, crest
 	var bot := PackedVector2Array()
 	var n := 14
 	for i in n + 1:
-		var x := lerpf(x0 - 34.0, x1 + 8.0, float(i) / n)
+		var x := lerpf(x0 - 34.0, x1 + Wave.LEDGE + 10.0, float(i) / n)
 		top.append(Vector2(x, tube_top - 48.0 + sin(t * 3.0 + i * 0.8) * 3.0))
 		bot.append(Vector2(x, tube_top - 8.0))
 	var band := top.duplicate()

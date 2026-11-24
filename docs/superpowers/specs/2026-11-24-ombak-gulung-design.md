@@ -64,6 +64,17 @@ Hasil main tahap 1 menunjukkan dua masalah:
   gulungan ombak, tahan sedikit supaya tidak tercebur".
 - **Autopilot:** di dekat teluk, terbang rendah menyusuri tanah, lalu menjaga ketinggian di tengah terowongan.
 
+## Angka akhir (2026-11-24)
+
+- `TUBE_TOP` -150, `CREST_Y` -1800, `HIT_PAD` 18, kolom terowongan `[water_x0 - 40, water_x1 + 40]`.
+- Bentuk di atas atap: muka miring keluar sampai 900 px di puncak (`face_x`, pangkat 1.3), punggung dari
+  ledge 140 px setelah ujung terowongan ke puncak selebar 300 px (`back_x`). Bentuk ini dipakai untuk cek kena
+  dan gambar.
+- Buih 3200, naik 2600, penuh 1500 (jarak ke `mid`); laju tinggi maks 2600 px/dtk; surut 0,9 dtk.
+- Terowongan selalu aman. Lolos setelah ledge + 40 px. Respawn "Lanjut" melewati ledge.
+- Tidak ada koin dalam 120 px dari bentuk ombak; 6 koin pemandu di y = 150 sepanjang air teluk.
+- Pelontar bibir dihapus seluruhnya (`kick_at`, `LIP_KICK`, pita oranye).
+
 ## Diserahkan ke pembuat
 
 Angka pasti diverifikasi oleh tes fisika (lewat di semua kecepatan, kena di jalur atas) dan dicatat di plan.

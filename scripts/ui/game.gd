@@ -162,7 +162,7 @@ func _continue_run() -> void:
 	b.exhausted = false
 	b.on_ground = false
 	# respawn safely: forward onto the first gentle dry ground past the water (score never drops)
-	b.position.x = world.kite.safe_x_after(world.terrain.dry_ground_after(b.position.x))
+	b.position.x = world.kite.safe_x_after(world.terrain.dry_ground_after(world.wave.safe_x_after(b.position.x)))
 	b.position.y = world.terrain.height_at(b.position.x) - 200.0
 	world.clear_hazards()
 	world.dead = false

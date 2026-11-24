@@ -1,6 +1,6 @@
 # Layang Tanpa Batas — design
 
-Status: disetujui (tahap 1 selesai, PR #2; tahap 2 selesai, PR #3; tahap 3 selesai di `feat/layangan-sawah`) · 2026-11-24 · lanjutan dari `2026-11-24-tahan-naik-design.md`
+Status: disetujui (tahap 1 selesai, PR #2, ombaknya diganti ombak gulung di `2026-11-24-ombak-gulung-design.md`; tahap 2 selesai, PR #3; tahap 3 selesai di `feat/layangan-sawah`) · 2026-11-24 · lanjutan dari `2026-11-24-tahan-naik-design.md`
 
 ## Intent (kenapa)
 

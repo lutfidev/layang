@@ -15,6 +15,9 @@ const LIP_RAMP := 480.0
 const BAY_FLOOR_Y := 380.0
 const BAY_HALF := 300.0
 const BANK_Y := 40.0
+const TUBE_COINS := 6
+const TUBE_COIN_Y := WATER_Y - 150.0         # the middle of the wave's tube
+const WAVE_COIN_PAD := 120.0                # also keeps coins off the wave's pale far copy
 # Sawah kites: villagers' kites hang over chosen peaks (see Kite); a coin arc runs over each one
 const KITES_PER_ISLAND := 2
 const KITE_ARC_COINS := 10
@@ -300,24 +303,31 @@ func _place_items(k: int, first_key: int, last_key: int, rng: RandomNumberGenera
 		var x1 := keys_x[i + 1]
 		var downhill := keys_y[i + 1] > keys_y[i]
 		var roll := rng.randf()
+		var tube := _bay_with_lip(x0)
+		if tube >= 0:
+			# guide coins through the wave's tube: low under the curl, clear of the water
+			var tb: Dictionary = bays[tube]
+			for j in TUBE_COINS:
+				var x := lerpf(float(tb.water_x0) - 20.0, float(tb.water_x1) + 20.0, j / float(TUBE_COINS - 1))
+				coins.add_item(Vector2(x, TUBE_COIN_Y), CoinField.COIN)
 		if downhill and roll < 0.34:
 			for j in 6:
 				var t := 0.22 + j * 0.1
 				var x := lerpf(x0, x1, t)
 				if is_water_at(x):
 					continue
-				coins.add_item(Vector2(x, height_at(x) - 38.0), CoinField.COIN)
+				_add_coin(Vector2(x, height_at(x) - 38.0))
 		elif (not downhill) and _is_kite_x(x1):
 			# the risky high line over a kite: a bigger arc above its body (the low line gets nothing extra)
 			for j in KITE_ARC_COINS:
 				var u := -1.0 + 2.0 * j / float(KITE_ARC_COINS - 1)
-				coins.add_item(Vector2(x1 + u * KITE_ARC_HALF, keys_y[i + 1] - KITE_ARC_TOP + u * u * 120.0), CoinField.COIN)
+				_add_coin(Vector2(x1 + u * KITE_ARC_HALF, keys_y[i + 1] - KITE_ARC_TOP + u * u * 120.0))
 		elif (not downhill) and roll < 0.3:
 			var cx := x1 + 260.0
 			var top := keys_y[i + 1] - rng.randf_range(250.0, 420.0)
 			for j in 7:
 				var u := (j - 3) / 3.0
-				coins.add_item(Vector2(cx + u * 240.0, top + u * u * 120.0), CoinField.COIN)
+				_add_coin(Vector2(cx + u * 240.0, top + u * u * 120.0))
 		# props on the ground
 		var n := 2 if prop_kind == "rice" else 1
 		for j in n:
@@ -327,6 +337,32 @@ func _place_items(k: int, first_key: int, last_key: int, rng: RandomNumberGenera
 					continue
 				props.append({"x": px, "kind": prop_kind, "island": k, "s": rng.randf_range(0.8, 1.3)})
 		i += 1
+
+
+## Adds a coin unless it would sit inside a bay's wave (coins must never lure the bird into it).
+func _add_coin(p: Vector2) -> void:
+	if not in_wave_shape(p, WAVE_COIN_PAD):
+		coins.add_item(p, CoinField.COIN)
+
+
+## True when p is inside (or within `pad` of) the full-height wave over any bay.
+func in_wave_shape(p: Vector2, pad: float) -> bool:
+	if p.y > Wave.TUBE_TOP + pad or p.y < Wave.CREST_Y - pad:
+		return false
+	for b in bays:
+		var x0 := float(b.water_x0) - Wave.COL_PAD
+		var x1 := float(b.water_x1) + Wave.COL_PAD
+		var y := clampf(p.y, Wave.CREST_Y, Wave.TUBE_TOP - 1.0)
+		if p.x > Wave.face_x(x0, y, Wave.CREST_Y) - pad and p.x < Wave.back_x(x0, x1, y, Wave.CREST_Y) + pad:
+			return true
+	return false
+
+
+func _bay_with_lip(x: float) -> int:
+	for i in bays.size():
+		if absf(float(bays[i].lip_x) - x) < 0.5:
+			return i
+	return -1
 
 
 func _is_kite_x(x: float) -> bool:
