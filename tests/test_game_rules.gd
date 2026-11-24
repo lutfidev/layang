@@ -176,3 +176,80 @@ func test_continue_after_bay_death_is_safe() -> String:
 		return "respawn not past the bay x=%f" % w.bird.position.x
 	_frames(g, 2.0)
 	return "" if deaths.size() == 1 else "died again right after continue: %s" % [deaths]
+
+
+# ---------------------------------------------------------------- sawah kites
+
+func test_kite_death_title() -> String:
+	var g := _game()
+	g.world.bird_died.emit("layangan")
+	if g.state != "over" or g.end_cause != "layangan":
+		return "state=%s cause=%s" % [g.state, g.end_cause]
+	if not _has_text(g.result_panel, "Tersangkut layangan!"):
+		return "results title missing"
+	return "" if _has_text(g.result_panel, "Terbang rendah di bawah ekor, atau tinggi di atasnya") else "tip missing"
+
+
+func test_sawah_warns_about_kites() -> String:
+	var g := _game()
+	var w: World = g.world
+	var kt: Dictionary = w.terrain.kites[0]
+	var shown := [0]
+	w.bird.position = Vector2(float(kt.x) - 1300.0, w.terrain.height_at(float(kt.x) - 1300.0))
+	w.bird.on_ground = true
+	for i in int(0.5 / DT):
+		g._physics_process(DT)
+		w._physics_process(DT)
+		if g.lbl_popup.text == "Awas layangan!" and g.lbl_popup.visible:
+			shown[0] += 1
+	if shown[0] == 0:
+		return "popup=%s" % g.lbl_popup.text
+	# a second approach (next kite) does not warn again
+	g.lbl_popup.text = ""
+	var k2: Dictionary = w.terrain.kites[1]
+	w.bird.position = Vector2(float(k2.x) - 1300.0, w.terrain.height_at(float(k2.x) - 1300.0))
+	_frames(g, 0.3)
+	return "" if g.lbl_popup.text != "Awas layangan!" else "warned twice"
+
+
+func test_continue_after_kite_death_is_safe() -> String:
+	var g := _game()
+	var w: World = g.world
+	var deaths: Array = []
+	w.bird_died.connect(func(c: String): deaths.append(c))
+	var kt: Dictionary = w.terrain.kites[0]
+	var y := Kite.body_center(kt, 0.0).y
+	w.bird.position = Vector2(float(kt.x) - 400.0, y + Bird.RADIUS)
+	w.bird.vel = Vector2(Bird.SPEED_START, 0.0)
+	w.bird.on_ground = false
+	w.input_enabled = true
+	for i in int(3.0 / DT):
+		if g.state != "play":
+			break
+		w._touch_hold = w.bird.center().y > y
+		w.bird.stamina = 1.0
+		g._physics_process(DT)
+		w._physics_process(DT)
+	if deaths != ["layangan"] or g.state != "over":
+		return "did not hit the kite: %s state=%s" % [deaths, g.state]
+	w._touch_hold = false
+	var before: int = g.score()
+	g._continue_run()
+	if w.bird.position.x <= Kite.span(kt).y:
+		return "respawn not past the kite x=%f" % w.bird.position.x
+	_frames(g, 2.0)
+	if g.score() < before:
+		return "score dropped %d -> %d" % [before, g.score()]
+	return "" if deaths.size() == 1 else "died again right after continue: %s" % [deaths]
+
+
+func test_continue_never_lands_in_kite() -> String:
+	var g := _game()
+	var w: World = g.world
+	for kt in w.terrain.kites:
+		var sp := Kite.span(kt)
+		for x in [sp.x - 100.0, (sp.x + sp.y) * 0.5, sp.y]:
+			var safe: float = w.kite.safe_x_after(x)
+			if safe < sp.y + 200.0:
+				return "x=%.0f -> %.0f, kite span %s" % [x, safe, sp]
+	return ""
