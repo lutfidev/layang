@@ -203,7 +203,7 @@ func _finish_level() -> void:
 	Game.add_coins(earned + bonus)
 	lbl_hint.hide()
 	if Game.dev.has("autoplay"):
-		print("RUN level=%s stars=%d coins=%d/%d dist=%d cause=selesai" % [level.id, stars, level_coins, level_coins_total, distance])
+		print("RUN level=%s stars=%d coins=%d/%d run_coins=%d dist=%d cause=selesai" % [level.id, stars, level_coins, level_coins_total, coins_run, distance])
 		if Game.dev.has("sim"):
 			get_tree().quit()
 	_show_level_done(stars, new_stars, earned, bonus)
@@ -688,9 +688,9 @@ func _show_level_done(stars: int, new_stars: int, earned: int, bonus: int) -> vo
 	v.add_child(il)
 	var hint := ""
 	if level_coins < ceili(COIN_STAR_RATIO * level_coins_total):
-		hint = "Kumpulkan %d koin untuk bintang kedua" % ceili(COIN_STAR_RATIO * level_coins_total)
+		hint = "Kumpulkan %d koin untuk dapat bintang lagi" % ceili(COIN_STAR_RATIO * level_coins_total)
 	elif continued:
-		hint = "Selesaikan tanpa Lanjut untuk bintang ketiga"
+		hint = "Selesaikan tanpa Lanjut untuk dapat bintang lagi"
 	if hint != "":
 		var hl := UIKit.label(hint, 22, Color(1, 1, 1, 0.75))
 		hl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

@@ -13,8 +13,20 @@ var _first := 0
 var _bursts: Array = []      # [pos, age, kind]
 
 
+## Inserts in x order: check() stops at the first item ahead of the bird, and terrain adds arcs that
+## reach past the next segment's ground coins.
 func add_item(p: Vector2, kind: int) -> void:
-	items.append([p, kind, true])
+	var lo := 0
+	var hi := items.size()
+	while lo < hi:
+		var mid := (lo + hi) / 2
+		if (items[mid][0] as Vector2).x <= p.x:
+			lo = mid + 1
+		else:
+			hi = mid
+	items.insert(lo, [p, kind, true])
+	if lo < _first:
+		_first += 1
 
 
 func check(bird_pos: Vector2, radius: float, magnet: float, delta: float) -> void:

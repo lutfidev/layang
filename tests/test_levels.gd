@@ -397,3 +397,48 @@ func test_menu_two_modes() -> String:
 		r = "old MAIN button still there"
 	_free_node(m)
 	return r
+
+
+# ---------------------------------------------------------------- every ready level is completable (Task 5)
+
+func test_ready_levels_completable() -> String:
+	var keep: Dictionary = Game.level_stars.duplicate()
+	var coins0 := Game.coins
+	var r := ""
+	for lv in Levels.all():
+		if not Levels.is_ready(lv):
+			continue
+		var g := _level_game(String(lv.id))
+		var w: World = g.world
+		w.autoplay = true
+		var t := 0.0
+		while t < 150.0 and g.state == "play":
+			g._physics_process(DT)
+			w._physics_process(DT)
+			t += DT
+		if g.state != "done":
+			r = "%s: state %s (%s) at x=%.0f of %.0f" % [lv.id, g.state, g.end_cause, w.bird.position.x, w.terrain.island_finish[0]]
+		runner.remove_child(g)
+		g.free()
+		if r != "":
+			break
+	Game.level_stars = keep
+	Game.coins = coins0
+	return r
+
+
+func test_coin_items_sorted() -> String:
+	# CoinField.check stops at the first coin ahead of the bird, so items must stay sorted by x
+	for lv in [Levels.get_level("sawah-3"), Levels.get_level("pantai-3"), Levels.get_level("hutan-3")]:
+		var w := _level_world(lv)
+		w.terrain.update_view(0.0, 60000.0)
+		var items: Array = w.coins.items
+		var bad := -1
+		for i in range(1, items.size()):
+			if (items[i][0] as Vector2).x < (items[i - 1][0] as Vector2).x:
+				bad = i
+				break
+		_free(w)
+		if bad >= 0:
+			return "%s: coin %d out of order" % [lv.id, bad]
+	return ""
