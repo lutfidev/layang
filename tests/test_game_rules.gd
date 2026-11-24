@@ -154,7 +154,7 @@ func test_wave_passed_rewards() -> String:
 func test_pantai_warns_about_waves() -> String:
 	var g := _game()
 	g._on_island(1, Biomes.get_biome(1))
-	return "" if g.lbl_popup.text == "Awas ombak!" else "popup=%s" % g.lbl_popup.text
+	return "" if g.lbl_popup.text == "Awas ombak raksasa!" else "popup=%s" % g.lbl_popup.text
 
 
 func test_continue_after_bay_death_is_safe() -> String:
@@ -165,7 +165,11 @@ func test_continue_after_bay_death_is_safe() -> String:
 	var deaths: Array = []
 	w.bird_died.connect(func(c: String): deaths.append(c))
 	var bay: Dictionary = w.terrain.bays[0]
-	w.bird.position = Vector2(bay.lip_x, Terrain.LIP_Y - 40.0)
+	# a bird high over the lip with the wall already standing: it flies into the wall above the tube
+	w.wave.bay = 0
+	w.wave.state = "rise"
+	w.wave.height = Wave.FULL_H
+	w.bird.position = Vector2(bay.lip_x, Wave.TUBE_TOP - 250.0)
 	w.bird.vel = Vector2(Bird.SPEED_START, 0.0)
 	w.bird.on_ground = false
 	_frames(g, 3.0)
