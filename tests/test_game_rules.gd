@@ -1,5 +1,5 @@
 extends RefCounted
-## Run rules in game.gd: skim combo → fever, bonk resets, death causes, continue, nightfall.
+## Run rules in game.gd: skim combo → fever, bonk resets, death causes, continue, endless run, lose screen.
 
 var runner: Node
 const DT := 1.0 / 120.0
@@ -19,6 +19,14 @@ func _has_text(n: Node, text: String) -> bool:
 		if _has_text(c, text):
 			return true
 	return false
+
+
+func _buttons(n: Node, out: Array = []) -> Array:
+	if n is Button:
+		out.append(n)
+	for c in n.get_children():
+		_buttons(c, out)
+	return out
 
 
 func _sea_start(w: World) -> float:
@@ -69,27 +77,62 @@ func test_continue_after_drown_is_safe() -> String:
 	_frames(g, 3.0)
 	if deaths != ["laut"] or g.state != "over":
 		return "did not drown first: %s state=%s" % [deaths, g.state]
+	var score_before: int = g.score()
 	g._continue_run()
-	if w.bird.position.y > Terrain.WATER_Y - 500.0:
+	if w.terrain.is_water_at(w.bird.position.x):
+		return "respawned over water x=%f" % w.bird.position.x
+	if w.bird.position.y > w.terrain.height_at(w.bird.position.x) - 150.0:
 		return "respawn too low y=%f" % w.bird.position.y
 	if w.bird.stamina != 1.0 or w.bird.exhausted:
 		return "stamina not restored"
 	if w.monster.state != "idle":
 		return "monster still active"
 	_frames(g, 1.5)
+	if g.score() < score_before:
+		return "score dropped %d -> %d" % [score_before, g.score()]
 	return "" if deaths.size() == 1 else "died again right after continue: %s" % [deaths]
 
 
-func test_night_over_sea_ends_run() -> String:
+func test_no_timer_endless() -> String:
 	var g := _game()
+	for p in ["time_left", "night_t", "time_bar"]:
+		if p in g:
+			return "timer leftover: %s" % p
 	var w: World = g.world
-	w.bird.position = Vector2(_sea_start(w) + 50.0, Terrain.WATER_Y - 400.0)
-	w.bird.on_ground = false
-	g.time_left = 0.1
-	_frames(g, g.NIGHT_GRACE + 4.0)
-	if g.state != "over":
-		return "still %s after grace" % g.state
-	return "" if g.end_cause in ["laut", "senja"] else "cause=%s" % g.end_cause
+	w.hazards = false     # bounces off the water: only a timer could end this run
+	_frames(g, 60.0)
+	if g.state != "play":
+		return "run ended without an obstacle: state=%s cause=%s" % [g.state, g.end_cause]
+	return "" if g.distance > 0 else "distance=%d" % g.distance
+
+
+func test_lose_screen_three_buttons() -> String:
+	var g := _game()
+	g.world.bird_died.emit("laut")
+	var names: Array = []
+	for b in _buttons(g.result_panel):
+		names.append(String(b.name))
+	names.sort()
+	if names != ["Lanjut", "MainLagi", "Menu"]:
+		return "buttons=%s" % [names]
+	var labels: Array = []
+	for b in _buttons(g.result_panel):
+		labels.append(b.text)
+	if not ("Main Lagi" in labels and "Menu" in labels and "Lanjut (tonton iklan)" in labels):
+		return "button labels %s" % [labels]
+	return "" if _has_text(g.result_panel, g.CAUSE_TIPS["laut"]) else "cause tip missing"
+
+
+func test_continue_button_once() -> String:
+	var g := _game()
+	g.world.bird.position = Vector2(_sea_start(g.world) + 50.0, Terrain.WATER_Y + 10.0)
+	g.world.bird_died.emit("laut")
+	g._continue_run()
+	g.world.bird_died.emit("monster")
+	var cont: Button = g.result_panel.find_child("Lanjut", true, false)
+	if cont == null or not cont.disabled:
+		return "Lanjut should be disabled after one continue"
+	return "" if _buttons(g.result_panel).size() == 3 else "buttons=%d" % _buttons(g.result_panel).size()
 
 
 func test_wave_death_title() -> String:
@@ -129,7 +172,7 @@ func test_continue_after_bay_death_is_safe() -> String:
 	if deaths != ["ombak"] or g.state != "over":
 		return "did not hit the wave first: %s state=%s" % [deaths, g.state]
 	g._continue_run()
-	if w.bird.position.y > Terrain.WATER_Y - 500.0:
-		return "respawn too low y=%f" % w.bird.position.y
+	if w.terrain.is_water_at(w.bird.position.x) or w.bird.position.x < bay.water_x1:
+		return "respawn not past the bay x=%f" % w.bird.position.x
 	_frames(g, 2.0)
 	return "" if deaths.size() == 1 else "died again right after continue: %s" % [deaths]

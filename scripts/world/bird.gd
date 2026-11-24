@@ -37,7 +37,6 @@ var stamina := 1.0
 var exhausted := false
 var skim_t := 0.0
 var on_ground := true
-var sleepy := false
 var fever := false
 var air_time := 0.0
 var max_air_height := 0.0
@@ -98,7 +97,7 @@ func speed() -> float:
 
 
 func can_lift() -> bool:
-	return holding and not sleepy and not exhausted
+	return holding and not exhausted
 
 
 func step(delta: float) -> void:
@@ -110,7 +109,7 @@ func step(delta: float) -> void:
 		stamina = maxf(0.0, stamina - STAMINA_DRAIN * delta)
 		if stamina <= 0.0:
 			exhausted = true
-	elif not sleepy:
+	else:
 		stamina = minf(1.0, stamina + (STAMINA_REGEN_GROUND if on_ground else STAMINA_REGEN_AIR) * delta)
 	if exhausted and stamina >= STAMINA_RESUME:
 		exhausted = false
@@ -121,8 +120,6 @@ func step(delta: float) -> void:
 		target *= 1.3
 	if on_ground:
 		target *= 0.85
-	if sleepy:
-		target *= 0.7
 	vel.x = move_toward(vel.x, target, SPEED_ACCEL * delta)
 
 	if on_ground and lifting:
@@ -247,6 +244,4 @@ func _draw() -> void:
 	draw_circle(Vector2(12.6, -8.4), 1.2, Color.WHITE)
 	# cheek
 	draw_circle(Vector2(6, 3), 4.0, Color(1.0, 0.45, 0.5, 0.35))
-	if sleepy:
-		draw_line(Vector2(6, -8), Vector2(15, -8), Color("#1b1430"), 2.0)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

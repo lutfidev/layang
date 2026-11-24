@@ -1,12 +1,12 @@
 # LAYANG
-**Terbang melintasi Nusantara sebelum senja.**
+**Terbang tanpa batas melintasi Nusantara.**
 
 Game arcade *one-touch* untuk Android (landscape) yang dibuat dengan Godot 4.7.2. Semua visual digambar lewat kode dan shader. Musiknya disintesis, jadi proyek ini tidak memakai aset gambar sama sekali dan ukurannya kecil.
 
 ---
 
 ## 1. Pitch
-Seekor burung kecil terbang di atas bukit-bukit. **Tahan layar** = burung naik (menghabiskan stamina). **Lepas** = burung meluncur turun. Terbang rendah menyerempet bukit untuk combo, dan hati-hati di laut: tercebur atau digigit monster laut berarti run selesai. Kamu harus sampai ke pulau berikutnya sebelum matahari terbenam. Setiap pulau baru menambah waktu dan menampilkan pemandangan baru.
+Seekor burung kecil terbang di atas bukit-bukit. **Tahan layar** = burung naik (menghabiskan stamina). **Lepas** = burung meluncur turun. Terbang rendah menyerempet bukit untuk combo, dan hati-hati di laut: tercebur atau digigit monster laut berarti run selesai. Tidak ada batas waktu: run hanya berakhir karena rintangan (laut, monster laut, ombak di teluk Pantai). Lihat bahayanya dari jauh, lalu putuskan kapan menukik dan kapan melambung. Setiap pulau baru menampilkan pemandangan baru.
 
 * **Mudah dipahami dalam 3 detik, butuh waktu lama untuk mahir.** Formula ini sudah terbukti di Tiny Wings, Alto's Adventure, dan Hill Climb.
 * **Sesi pendek (1–3 menit)**, sehingga cocok dengan iklan berhadiah di akhir run.
@@ -22,9 +22,9 @@ Seekor burung kecil terbang di atas bukit-bukit. **Tahan layar** = burung naik (
 | Menyentuh tanah | Combo reset; jatuh keras / tanjakan curam = **Aduh!** kecepatan turun |
 | Menyentuh air laut | Run selesai (**Tercebur ke laut!**) |
 | Monster laut (gelembung = peringatan ~1 dtk) | Terbang tinggi! Kena gigit = run selesai |
-| Bintang matahari | +3 detik |
-| Pulau baru | +6 s/d +17 detik, +20 koin, +500 poin |
-| Waktu habis | Burung mengantuk, lalu run selesai (bisa lanjut lewat iklan) |
+| Ombak di teluk Pantai (buih = tanda) | Sentuh bibir oranye untuk melompat; kena ombak = run selesai |
+| Pulau baru | +20 koin, +500 poin |
+| Kalah | Layar kalah: penyebab + saran, tombol **Lanjut (tonton iklan)**, **Main Lagi**, **Menu** |
 
 ## 3. Enam pulau
 1. **Sawah Fajar**: terasering, lumbung, langit pink, biji ilalang melayang
@@ -39,15 +39,14 @@ Setelah pulau ke-6, siklusnya berulang dengan bukit yang lebih tinggi dan panjan
 ## 4. Monetisasi (sudah ada di kode, sekarang masih mode demo)
 | Sumber | Lokasi | Catatan |
 |---|---|---|
-| Rewarded: **Lanjut +12 detik** | Layar hasil | 1× per run |
-| Rewarded: **Koin ×2** | Layar hasil | Sumber koin utama |
+| Rewarded: **Lanjut** (terbang lagi di tanah aman, skor lanjut) | Layar kalah | 1× per run |
 | Interstitial | Setiap 3 run | Mati jika "Hapus Iklan" dibeli |
 | IAP **Hapus Iklan** | Menu | Rp 25.000 |
 | IAP **Garuda Emas** | Toko | Rp 15.000 (atau 3.500 koin) |
 | IAP **1.500 koin** | Toko | Rp 15.000 |
 | Hadiah harian | Menu | 50 → 500 koin, streak 7 hari |
 
-Ekonomi (dari simulasi autopilot): satu run menghasilkan ±70–100 koin. Skin pertama (300) bisa dibeli setelah ±3 run, sedangkan Garuda (3.500) butuh puluhan run. Celah inilah yang mendorong orang menonton iklan atau membeli IAP.
+Ekonomi (dari simulasi autopilot versi bertimer; dihitung ulang di tahap 5 "tanpa batas"): satu run menghasilkan ±70–100 koin. Skin pertama (300) bisa dibeli setelah ±3 run, sedangkan Garuda (3.500) butuh puluhan run. Celah inilah yang mendorong orang menonton iklan atau membeli IAP.
 
 Semua pemanggilan iklan/IAP lewat `scripts/autoload/ads.gd`. Untuk go-live, ganti bagian yang bertanda `# INTEGRATE:` dengan plugin **AdMob** (misalnya Godot AdMob by poing-studios) dan **Google Play Billing**. Bagian game lainnya tidak perlu diubah.
 
@@ -57,10 +56,12 @@ Semua pemanggilan iklan/IAP lewat `scripts/autoload/ads.gd`. Untuk go-live, gant
 3. Di PC: klik mouse / Spasi / ↑ / W = tahan. Esc = jeda.
 
 ### Flag dev (untuk testing)
-Jalankan dari terminal: `godot --path . res://scenes/game.tscn -- --island=3 --autoplay --time=10`
+Jalankan dari terminal: `godot --path . res://scenes/game.tscn -- --island=3 --autoplay --die=ombak`
 * `--island=N` mulai dari pulau N (0–5)
 * `--autoplay` burung dimainkan AI
-* `--time=S` sisa waktu awal (untuk mengetes layar hasil)
+* `--die=penyebab` (laut/monster/ombak) langsung kalah setelah 2 dtk, untuk mengetes layar kalah
+* `--seed=N` seed lintasan tetap
+* `--sim --sim-max=S` (di `game.tscn`) run autopilot berhenti setelah S detik (bawaan 240) dan mencetak `RUN score=…`
 * `--coins=N`, `--fresh` (abaikan save)
 * `--shot=path.png --shot-delay=4` ambil screenshot lalu keluar
 * `scenes/dev_world.tscn -- --sim --sim-time=60` simulasi headless untuk balancing

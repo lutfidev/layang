@@ -1,35 +1,37 @@
 extends Node2D
-## Game scene: rules (sunset timer, islands, combos, fever), HUD, pause and results.
+## Game scene: rules (endless run, islands, combos, fever), HUD, pause and results.
 
-const START_TIME := 42.0
-const NIGHT_GRACE := 6.0
+const SUN_PROGRESS := 0.8      # fixed sun height: the sky no longer counts down
+const SIM_MAX := 240.0          # --sim runs end after this many seconds (cause "batas")
 const HIGH_FLIGHT := 520.0     # px above ground/water for "TERBANG TINGGI!"
 const WAVE_POINTS := 150        # style points for clearing a beach wave
+const CAUSE_TITLES := {"laut": "Tercebur ke laut!", "monster": "Digigit monster laut!", "ombak": "Terkena ombak", "batas": "Simulasi selesai"}
+const CAUSE_TIPS := {
+	"laut": "Tahan untuk naik sebelum stamina habis di atas laut",
+	"monster": "Lihat tandanya di air, lalu naik tinggi menjauh",
+	"ombak": "Sentuh bibir oranye untuk melompati ombak",
+}
 
 var world: World
-var state := "ready"       # ready → play → night → over
-var time_left := START_TIME
+var state := "ready"       # ready → play → over
+var run_time := 0.0
 var distance := 0
 var style_points := 0
 var coins_run := 0
 var coins_banked := 0
 var skim_streak := 0
 var best_skim := 0
-var end_cause := ""         # senja | laut | monster | ombak
+var end_cause := ""         # laut | monster | ombak (batas = sim cap)
 var _high_awarded := false
 var fever_t := 0.0
-var night_t := 0.0
 var continued := false
-var doubled := false
 var coin_chain := 0
 var coin_chain_t := 0.0
 var start_x := 0.0
 var hint_t := 0.0
 
 var hud: CanvasLayer
-var time_bar: TimeBar
 var stamina_bar: StaminaBar
-var lbl_time: Label
 var lbl_score: Label
 var coin_pill: PanelContainer
 var lbl_island: Label
@@ -44,12 +46,11 @@ var result_panel: Control
 
 
 func _ready() -> void:
-	if Game.dev.has("time"):
-		time_left = float(Game.dev["time"])
 	world = World.new()
 	world.start_island = Game.dev_int("island", 0)
 	world.run_seed = Game.dev_int("seed", 1)   # 1 = random (see World._ready)
 	world.running = false
+	world.sun_progress = SUN_PROGRESS
 	world.autoplay = Game.dev.has("autoplay")
 	add_child(world)
 	start_x = world.bird.position.x
@@ -68,7 +69,7 @@ func _ready() -> void:
 # ================================================================ flow
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("pause") and state in ["play", "night"]:
+	if event.is_action_pressed("pause") and state == "play":
 		_toggle_pause()
 		return
 	if state == "ready":
@@ -93,20 +94,15 @@ func _start() -> void:
 
 func _physics_process(delta: float) -> void:
 	if state == "play":
-		time_left -= delta
-		if time_left <= 0.0:
-			time_left = 0.0
-			_nightfall()
-	elif state == "night":
-		night_t += delta
-		var b := world.bird
-		if night_t > NIGHT_GRACE or (b.on_ground and night_t > 1.5 and b.speed() < 150.0):
-			_finish("senja")
-	if state in ["play", "night"]:
-		distance = int((world.bird.position.x - start_x) / 10.0)
+		run_time += delta
+		distance = maxi(distance, int((world.bird.position.x - start_x) / 10.0))
 		_check_high_flight()
-		world.sun_progress = clampf(time_left / START_TIME, 0.0, 1.0)
-		world.set_dusk(clampf(1.0 - time_left / 12.0, 0.0, 1.0))
+		if Game.dev.has("sim") and run_time >= float(Game.dev.get("sim-max", SIM_MAX)):
+			_finish("batas")
+			return
+		if Game.dev.has("die") and run_time >= 2.0:   # dev: show the lose screen for this cause
+			_finish(str(Game.dev["die"]))
+			return
 		if fever_t > 0.0:
 			fever_t -= delta
 			if fever_t <= 0.0:
@@ -122,10 +118,8 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(_delta: float) -> void:
-	time_bar.value = clampf(time_left / START_TIME, 0.0, 1.0)
 	stamina_bar.value = world.bird.stamina
-	stamina_bar.exhausted = world.bird.exhausted or world.bird.sleepy
-	lbl_time.text = "%d" % ceili(time_left)
+	stamina_bar.exhausted = world.bird.exhausted
 	lbl_score.text = _fmt(score())
 	(coin_pill.get_node("H/Label") as Label).text = str(coins_run)
 	if fever_lbl.visible:
@@ -134,16 +128,6 @@ func _process(_delta: float) -> void:
 
 func score() -> int:
 	return distance + style_points
-
-
-func _nightfall() -> void:
-	state = "night"
-	night_t = 0.0
-	world.bird.sleepy = true
-	world.bird.fever = false
-	fever_lbl.hide()
-	Sfx.play("night")
-	_popup("Matahari terbenam…", "Burung mulai mengantuk", Color("#ffd0a8"))
 
 
 func _finish(cause: String) -> void:
@@ -168,57 +152,40 @@ func _continue_run() -> void:
 	continued = true
 	result_panel.queue_free()
 	result_panel = null
-	time_left = 12.0
 	state = "play"
 	var b := world.bird
-	b.sleepy = false
 	b.vel.x = maxf(b.vel.x, 500.0)
 	b.vel.y = 0.0
 	b.stamina = 1.0
 	b.exhausted = false
 	b.on_ground = false
-	# respawn safely: high above the water (time to react), or just above the ground
-	if world.terrain.is_water_at(b.position.x):
-		b.position.y = Terrain.WATER_Y - 900.0
-	else:
-		b.position.y = world.terrain.height_at(b.position.x) - 200.0
+	# respawn safely: forward onto the first gentle dry ground past the water (score never drops)
+	b.position.x = world.terrain.dry_ground_after(b.position.x)
+	b.position.y = world.terrain.height_at(b.position.x) - 200.0
 	world.clear_hazards()
 	world.dead = false
 	world.running = true
 	world.release_input()
-	_popup("+12 detik!", "Terbang lagi!", Color("#ffe066"))
+	_popup("Terbang lagi!", "", Color("#ffe066"))
 
 
 # ================================================================ events
 
 func _on_island(k: int, biome: Dictionary) -> void:
-	var bonus := maxf(6.0, 17.0 - k * 1.5)
-	if state == "play":
-		time_left += bonus
-	elif state == "night":
-		# reaching an island at dusk wakes the bird up again
-		state = "play"
-		time_left = bonus
-		world.bird.sleepy = false
 	style_points += 500
 	coins_run += 20
 	Sfx.play("island")
 	Ambient.burst(world, world.bird.center(), Color("#ffe066"), 40, 700.0)
-	_show_banner(k, biome, bonus)
+	_show_banner(k, biome)
 	if biome.id == "pantai":
 		_popup("Awas ombak!", "Sentuh bibir oranye untuk melompat", Color("#7ff0e6"))
 
 
-func _on_item(kind: int, _pos: Vector2) -> void:
-	if kind == CoinField.COIN:
-		coins_run += 2 if world.bird.fever else 1
-		coin_chain += 1
-		coin_chain_t = 0.6
-		Sfx.play("coin", 1.0 + 0.045 * mini(coin_chain, 14))
-	else:
-		time_left += 3.0
-		Sfx.play("sun")
-		_popup("+3 detik", "Matahari kecil!", Color("#ffe066"))
+func _on_item(_kind: int, _pos: Vector2) -> void:
+	coins_run += 2 if world.bird.fever else 1
+	coin_chain += 1
+	coin_chain_t = 0.6
+	Sfx.play("coin", 1.0 + 0.045 * mini(coin_chain, 14))
 
 
 func _on_landed(bonk: bool) -> void:
@@ -232,14 +199,14 @@ func _on_landed(bonk: bool) -> void:
 
 
 func _on_skimmed(_duration: float) -> void:
-	if state not in ["play", "night"]:
+	if state != "play":
 		return
 	skim_streak += 1
 	best_skim = maxi(best_skim, skim_streak)
 	style_points += 25 * skim_streak
 	Sfx.play("perfect", 1.0 + 0.06 * mini(skim_streak, 8))
 	var b := world.bird
-	if skim_streak >= 3 and fever_t <= 0.0 and state == "play":
+	if skim_streak >= 3 and fever_t <= 0.0:
 		fever_t = 6.0
 		b.fever = true
 		fever_lbl.show()
@@ -256,7 +223,7 @@ func _on_skimmed(_duration: float) -> void:
 
 
 func _on_wave_passed() -> void:
-	if state not in ["play", "night"]:
+	if state != "play":
 		return
 	style_points += WAVE_POINTS
 	Sfx.play("perfect", 1.2)
@@ -264,7 +231,7 @@ func _on_wave_passed() -> void:
 
 
 func _on_died(cause: String) -> void:
-	if state in ["play", "night"]:
+	if state == "play":
 		_finish(cause)
 
 
@@ -290,25 +257,13 @@ func _build_hud() -> void:
 	var root := UIKit.full_rect(Control.new())
 	hud.add_child(root)
 
-	# --- time bar (top-left)
-	var tb := HBoxContainer.new()
-	tb.position = Vector2(28, 24)
-	tb.add_theme_constant_override("separation", 10)
-	tb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(tb)
-	tb.add_child(UIKit.SunIcon.new(42))
-	time_bar = TimeBar.new()
-	time_bar.custom_minimum_size = Vector2(300, 26)
-	time_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	tb.add_child(time_bar)
-	lbl_time = UIKit.label("42", 32, Color.WHITE, true, 8)
-	tb.add_child(lbl_time)
+	# --- island name + stamina (top-left)
 	lbl_island = UIKit.label("", 22, Color(1, 1, 1, 0.92), false, 6)
-	lbl_island.position = Vector2(84, 62)
+	lbl_island.position = Vector2(28, 26)
 	root.add_child(lbl_island)
 	_set_island_label(0, world.current_biome())
 	stamina_bar = StaminaBar.new()
-	stamina_bar.position = Vector2(84, 98)
+	stamina_bar.position = Vector2(28, 62)
 	stamina_bar.size = Vector2(200, 14)
 	stamina_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(stamina_bar)
@@ -354,7 +309,7 @@ func _build_hud() -> void:
 	root.add_child(lbl_sub)
 
 	fever_lbl = UIKit.label("FEVER", 30, Color("#ffcf5a"), true, 10)
-	fever_lbl.position = Vector2(30, 124)
+	fever_lbl.position = Vector2(28, 86)
 	fever_lbl.hide()
 	root.add_child(fever_lbl)
 
@@ -435,7 +390,7 @@ func _hide_hint() -> void:
 		t.tween_callback(lbl_hint.hide)
 
 
-func _show_banner(k: int, b: Dictionary, bonus: float) -> void:
+func _show_banner(k: int, b: Dictionary) -> void:
 	_set_island_label(k, b)
 	if banner:
 		banner.queue_free()
@@ -449,7 +404,7 @@ func _show_banner(k: int, b: Dictionary, bonus: float) -> void:
 	var n := UIKit.label(String(b.name), 50, Color.WHITE, true)
 	n.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(n)
-	var s := UIKit.label("%s   •   +%d detik" % [b.subtitle, int(bonus)], 22, Color(1, 1, 1, 0.85))
+	var s := UIKit.label("%s   •   +500" % b.subtitle, 22, Color(1, 1, 1, 0.85))
 	s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(s)
 	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -539,10 +494,14 @@ func _show_results(record: bool) -> void:
 	v.add_theme_constant_override("separation", 10)
 	p.add_child(v)
 
-	var titles := {"senja": "Senja telah tiba", "laut": "Tercebur ke laut!", "monster": "Digigit monster laut!", "ombak": "Terkena ombak"}
-	var title := UIKit.label(titles.get(end_cause, "Senja telah tiba"), 44, Color("#ffd8a8"), true)
+	var title := UIKit.label(String(CAUSE_TITLES.get(end_cause, "Run selesai")), 44, Color("#ffd8a8"), true)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(title)
+	var tip := String(CAUSE_TIPS.get(end_cause, ""))
+	if tip != "":
+		var tl := UIKit.label(tip, 22, Color(1, 1, 1, 0.8))
+		tl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		v.add_child(tl)
 	if record:
 		var rec := UIKit.label("REKOR BARU!", 28, Color("#ffe066"), true, 6)
 		rec.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -572,44 +531,33 @@ func _show_results(record: bool) -> void:
 		val.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		grid.add_child(val)
 
-	var ads_row := HBoxContainer.new()
-	ads_row.add_theme_constant_override("separation", 12)
-	v.add_child(ads_row)
-	if not continued:
-		var cont := UIKit.button("Lanjut +12 dtk (iklan)", UIKit.LEAF, UIKit.LEAF_DARK, 24)
-		cont.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# exactly three buttons: Lanjut (ad, once per run), Main Lagi, Menu
+	var cont := UIKit.button("Lanjut (tonton iklan)", UIKit.LEAF, UIKit.LEAF_DARK, 28)
+	cont.name = "Lanjut"
+	if continued:
+		cont.text = "Lanjut sudah dipakai"
+		cont.disabled = true
+	else:
 		cont.pressed.connect(func(): Ads.show_rewarded("Lanjut terbang", _on_continue_reward))
-		ads_row.add_child(cont)
-	if coins_run > 0 and not doubled:
-		var dbl := UIKit.button("Koin ×2 (iklan)", UIKit.SUN, UIKit.SUN_DARK, 24)
-		dbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		dbl.pressed.connect(func(): Ads.show_rewarded("Gandakan koin", _on_double_reward.bind(dbl)))
-		ads_row.add_child(dbl)
-
-	var row2 := HBoxContainer.new()
-	row2.add_theme_constant_override("separation", 12)
-	v.add_child(row2)
+	v.add_child(cont)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	v.add_child(row)
 	var again := UIKit.button("Main Lagi", UIKit.SKY, UIKit.SKY_DARK, 30)
+	again.name = "MainLagi"
 	again.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	again.pressed.connect(func(): Ads.on_run_finished(); Game.goto("res://scenes/game.tscn"))
-	row2.add_child(again)
+	row.add_child(again)
 	var menu := UIKit.button("Menu", UIKit.PLUM, UIKit.PLUM_DARK, 30)
+	menu.name = "Menu"
+	menu.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	menu.pressed.connect(func(): Ads.on_run_finished(); Game.goto("res://scenes/main_menu.tscn"))
-	row2.add_child(menu)
+	row.add_child(menu)
 
 
 func _on_continue_reward(ok: bool) -> void:
 	if ok:
 		_continue_run()
-
-
-func _on_double_reward(ok: bool, btn: Button) -> void:
-	if ok and not doubled:
-		doubled = true
-		Game.add_coins(coins_run)
-		btn.disabled = true
-		btn.text = "+%d koin!" % coins_run
-		Sfx.play("buy")
 
 
 static func _fmt(n: int) -> String:
@@ -621,7 +569,7 @@ static func _fmt(n: int) -> String:
 	return s + out
 
 
-# ================================================================ time bar
+# ================================================================ stamina bar
 
 class StaminaBar:
 	extends Control
@@ -646,28 +594,3 @@ class StaminaBar:
 		fill.set_corner_radius_all(int((size.y - 4) / 2))
 		draw_style_box(fill, Rect2(Vector2(2, 2), Vector2(maxf(size.y - 4, (size.x - 4) * value), size.y - 4)))
 
-
-class TimeBar:
-	extends Control
-	var value := 1.0
-
-	func _process(_d: float) -> void:
-		queue_redraw()
-
-	func _draw() -> void:
-		var r := Rect2(Vector2.ZERO, size)
-		var bg := StyleBoxFlat.new()
-		bg.bg_color = Color(0.08, 0.05, 0.16, 0.6)
-		bg.set_corner_radius_all(int(size.y / 2))
-		draw_style_box(bg, r)
-		var w := maxf(size.y, (size.x - 6) * value)
-		var fill := StyleBoxFlat.new()
-		var low := value < 0.28
-		var col := Color("#ffd24a").lerp(Color("#ff6b4a"), clampf((0.45 - value) / 0.35, 0.0, 1.0))
-		if low:
-			col = col.lerp(Color.WHITE, 0.25 + 0.25 * sin(Time.get_ticks_msec() * 0.015))
-		fill.bg_color = col
-		fill.set_corner_radius_all(int((size.y - 6) / 2))
-		if value > 0.0:
-			draw_style_box(fill, Rect2(Vector2(3, 3), Vector2(w, size.y - 6)))
-		draw_rect(Rect2(Vector2(10, 6), Vector2(maxf(0.0, w - 14), 3)), Color(1, 1, 1, 0.35))
