@@ -8,7 +8,7 @@
 
 ## Status (2026-11-24)
 
-- **Selesai** di branch `feat/ombak-pantai` (Task 1–5, 44 tes hijau).
+- **Selesai** di branch `feat/ombak-pantai` (Task 1–5, 47 tes hijau; 3 temuan review akhir sudah diperbaiki).
 - Penyimpangan dari rencana: autopilot tidak diubah (autopilot lama sudah terbang ±70 px di atas bibir dan
   lolos ombak; tes `test_autopilot_clears_bays` terbukti gagal kalau ombak dibuat lebih tinggi), panah bibir
   digambar sebagai segitiga panjang (chevron terbaca seperti angka 7), ombak rendah (<24 px) digambar sebagai
