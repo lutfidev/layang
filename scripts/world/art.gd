@@ -260,20 +260,21 @@ static func launch_ramp(ci: CanvasItem, surface: PackedVector2Array, col: Color,
 		return
 	var band := PackedVector2Array(surface)
 	for i in range(surface.size() - 1, -1, -1):
-		band.append(surface[i] + Vector2(0, 16))
+		band.append(surface[i] + Vector2(0, 26))
 	ci.draw_colored_polygon(band, col)
 	ci.draw_polyline(surface, edge, 4.0, true)
 	var n := surface.size()
 	for k in 3:
 		var u := fmod(t * 0.9 + k / 3.0, 1.0)
 		var i := clampi(int(u * (n - 1)), 0, n - 2)
-		var p := surface[i]
-		var dir := (surface[i + 1] - surface[i]).normalized().rotated(-0.6)
+		var dir := (surface[i + 1] - surface[i]).normalized().rotated(-0.15)
 		var nrm := dir.orthogonal()
 		var a := sin(u * PI)
-		var c := Color(1, 1, 1, 0.9 * a)
-		var tip := p + Vector2(0, -26) + dir * 12.0
-		ci.draw_polyline(PackedVector2Array([tip - dir * 14.0 + nrm * 11.0, tip, tip - dir * 14.0 - nrm * 11.0]), c, 5.0, true)
+		var tip := surface[i] + Vector2(0, -46) + dir * 30.0
+		var back := tip - dir * 50.0
+		# filled arrow head pointing up the ramp
+		var c := Color(1, 1, 1, 0.95 * a)
+		ci.draw_colored_polygon(PackedVector2Array([tip, back - nrm * 13.0, back + nrm * 13.0]), c)
 
 
 ## Bubbling foam on a bay's surface: the warning before a wave. `density` 0..1 grows as it nears.
@@ -289,28 +290,40 @@ static func foam(ci: CanvasItem, x0: float, x1: float, y: float, density: float,
 	ci.draw_line(Vector2(x0, y + 1.0), Vector2(x1, y + 1.0), Color(1, 1, 1, 0.5 + 0.4 * density), 5.0)
 
 
-## A standing beach wave: a teal wall around `mid` with a foamy lip curling to the left
+## A standing beach wave: a rounded teal wall around `mid` whose foamy crest curls to the left
 ## (towards the oncoming bird), plus a soft shadow at its foot.
 static func wave(ci: CanvasItem, mid: float, half_w: float, water_y: float, h: float, water: Color, foam_col: Color, t: float) -> void:
-	shadow(ci, Vector2(mid, water_y + 6.0), half_w * 1.4, 12.0, 0.35)
+	shadow(ci, Vector2(mid, water_y + 6.0), half_w * 1.6, 12.0, 0.35)
 	var top := water_y - h
+	var wob := sin(t * 3.0) * 4.0
+	# body: long gentle back slope on the right, steep curling face on the left
 	var pts := PackedVector2Array()
-	pts.append(Vector2(mid + half_w * 1.5, water_y + 4.0))
-	for i in 13:
-		var u := float(i) / 12.0
-		var x := mid + half_w * 1.5 - u * half_w * 2.7
-		var bulge := sin(u * PI) * 0.12 * h
-		var y := lerpf(water_y, top, sin(u * PI * 0.5)) - bulge * 0.2 + sin(t * 4.0 + u * 6.0) * 3.0
+	for i in 17:
+		var u := float(i) / 16.0                       # 0 = right foot, 1 = crest
+		var x := lerpf(mid + half_w * 2.2, mid + half_w * 0.1, u)
+		var y := lerpf(water_y + 4.0, top, 1.0 - pow(1.0 - u, 2.2)) + sin(t * 4.0 + u * 7.0) * 2.0
 		pts.append(Vector2(x, y))
-	pts.append(Vector2(mid - half_w * 1.2, top + h * 0.22))
-	pts.append(Vector2(mid - half_w * 1.0, water_y + 4.0))
+	# the curl: crest -> overhanging tip -> back under -> left foot (simple, non-crossing outline)
+	pts.append(Vector2(mid - half_w * 0.9, top + h * 0.25 + wob))
+	pts.append(Vector2(mid - half_w * 0.55, top + h * 0.42))
+	pts.append(Vector2(mid - half_w * 0.85, water_y + 4.0))
 	ci.draw_colored_polygon(pts, water)
-	var face := PackedVector2Array([Vector2(mid - half_w * 0.9, water_y + 4.0), Vector2(mid - half_w * 0.95, top + h * 0.3), Vector2(mid - half_w * 0.2, top + h * 0.12), Vector2(mid + half_w * 0.2, water_y + 4.0)])
-	ci.draw_colored_polygon(face, water.darkened(0.18))
-	# curling foam lip
-	for i in 9:
-		var u := float(i) / 8.0
-		var cx := mid + half_w * (0.6 - u * 1.8)
-		var cy := top + h * 0.06 * sin(u * PI) + u * u * h * 0.2
-		ci.draw_circle(Vector2(cx, cy), 13.0 - u * 5.0 + sin(t * 6.0 + i) * 1.5, foam_col)
-	ci.draw_circle(Vector2(mid - half_w * 1.25, top + h * 0.24), 8.0, foam_col)
+	# darker hollow under the curl
+	ci.draw_colored_polygon(PackedVector2Array([
+		Vector2(mid - half_w * 0.55, top + h * 0.42), Vector2(mid + half_w * 0.1, top + h * 0.3),
+		Vector2(mid + half_w * 0.5, water_y + 4.0), Vector2(mid - half_w * 0.85, water_y + 4.0)]), water.darkened(0.22))
+	var cc := Vector2(mid - half_w * 0.35, top + h * 0.12 + wob * 0.5)
+	var cr := h * 0.13
+	# lighter stripe on the back
+	for i in 3:
+		var y := lerpf(top + h * 0.3, water_y - 10.0, float(i) / 3.0)
+		ci.draw_line(Vector2(mid + half_w * (0.4 + i * 0.4), y), Vector2(mid + half_w * (0.9 + i * 0.45), y + 8.0), water.lightened(0.25), 4.0, true)
+	# foam along the crest and curl
+	for i in 11:
+		var ang := -PI * 0.1 - float(i) / 10.0 * PI
+		var p := cc + Vector2(cos(ang), sin(ang)) * Vector2(half_w * 0.6, cr)
+		ci.draw_circle(p, 12.0 - i * 0.5 + sin(t * 6.0 + i) * 1.5, foam_col)
+	ci.draw_circle(Vector2(mid - half_w * 0.9, top + h * 0.25 + wob), 8.0, foam_col)
+	for i in 6:
+		var u := fmod(t * 0.8 + i / 6.0, 1.0)
+		ci.draw_circle(Vector2(mid - half_w * 0.9 + u * half_w * 0.2, water_y - u * 30.0), 5.0 * (1.0 - u), Color(1, 1, 1, 0.8 * (1.0 - u)))

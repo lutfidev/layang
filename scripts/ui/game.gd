@@ -48,6 +48,7 @@ func _ready() -> void:
 		time_left = float(Game.dev["time"])
 	world = World.new()
 	world.start_island = Game.dev_int("island", 0)
+	world.run_seed = Game.dev_int("seed", 1)   # 1 = random (see World._ready)
 	world.running = false
 	world.autoplay = Game.dev.has("autoplay")
 	add_child(world)

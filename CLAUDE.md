@@ -23,6 +23,7 @@ Godot 4.7.2, GDScript, GL Compatibility renderer, landscape 1280x720 (stretch ca
 - Headless error check: `godot --headless --path . --quit-after 600 res://scenes/game.tscn -- --autoplay`
 - Balance sim: `godot --headless --path . --fixed-fps 120 res://scenes/game.tscn -- --autoplay --sim --fresh --nosave` prints `RUN score=…`
 - Screenshot: `... res://scenes/game.tscn -- --island=4 --autoplay --shot=out.png --shot-delay=8`
+- Beach wave screenshot (Pantai, fixed seed): `... res://scenes/game.tscn -- --island=1 --seed=4242 --autoplay --nosave --shot=out.png --shot-delay=9` (delay 7 = foam + launch lip, 9 = full wave). `--seed=N` fixes the run seed.
 
 ## Alur git per langkah
 

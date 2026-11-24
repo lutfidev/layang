@@ -349,3 +349,26 @@ func test_fever_overshoot_passes_once() -> String:
 	if w.dead:
 		return "died"
 	return "" if passes[0] == 1 else "passes=%d" % passes[0]
+
+
+func test_autopilot_clears_bays() -> String:
+	for s in [11, 22, 33, 44, 55]:
+		var w := _world(s, 1)
+		w.autoplay = true
+		var deaths: Array = []
+		var passes := [0]
+		w.bird_died.connect(func(c: String): deaths.append(c))
+		w.wave_passed.connect(func(): passes[0] += 1)
+		var end_x: float = w.terrain.bays[w.terrain.bays.size() - 1].bank_x + 100.0
+		var t := 0.0
+		while t < 90.0 and deaths.is_empty() and w.bird.position.x < end_x:
+			w._physics_process(DT)
+			t += DT
+		var at := w.bird.position.x
+		var bay := w.terrain.bay_at(at)
+		_free(w)
+		if not deaths.is_empty():
+			return "seed %d: died (%s) at x=%.0f bay=%d after %d passes" % [s, deaths[0], at, bay, passes[0]]
+		if passes[0] != Terrain.BAYS_PER_ISLAND:
+			return "seed %d: passes=%d (t=%.1f)" % [s, passes[0], t]
+	return ""

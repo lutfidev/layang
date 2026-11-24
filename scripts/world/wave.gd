@@ -91,5 +91,8 @@ func _draw() -> void:
 	var biome: Dictionary = Biomes.get_biome(terrain.start_island + int(b.island))
 	var density := 1.0 if state != "foam" else clampf((FOAM_DIST - _d) / (FOAM_DIST - RISE_DIST), 0.0, 1.0)
 	Art.foam(self, b.water_x0, b.water_x1, Terrain.WATER_Y, 0.35 + 0.65 * density, _anim)
-	if height > 1.0:
+	if height > 24.0:
 		Art.wave(self, b.mid, WAVE_HALF, Terrain.WATER_Y, height, biome.water, biome.water_top, _anim)
+	elif height > 1.0:
+		# too low for the curl outline (it would degenerate): a swelling mound
+		Art.ellipse(self, Vector2(b.mid, Terrain.WATER_Y), WAVE_HALF * 1.4, height, biome.water)
