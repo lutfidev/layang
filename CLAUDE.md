@@ -35,5 +35,4 @@ Satu "langkah" = satu rencana di `docs/superpowers/plans/` (atau satu fase dari 
 - **Merge PR** dilakukan pemilik repo di GitHub; jangan merge sendiri kecuali diminta.
 - **Tambahan ke PR yang sudah ada:** sebelum push, cek `gh pr view <nomor> --json state` masih `OPEN`. Kalau sudah di-merge, buat branch baru dari HEAD sekarang dan buka PR baru dengan judul dan badan lengkap. Jangan mengubah badan PR yang sudah di-merge.
 - **Atribusi:** commit dan PR atas nama akun git pemilik repo. Jangan tambahkan `Co-Authored-By: Claude`, "Generated with Claude Code", atau atribusi Claude lain di pesan commit maupun badan PR.
-- **Transisi:** branch `tahan-naik` dibuat sebelum aturan ini dan belum pernah di-push. Langkah berikutnya diawali dengan menjalankan cek wajib di `tahan-naik`, push, dan buka PR-nya (judul `feat: tahan naik`); langkah baru baru dimulai dari `main` setelah PR itu di-merge. Hapus poin ini setelah PR tersebut di-merge.
 - Kesepakatan baru soal alur kerja langsung dicatat di file ini, jangan hanya diucapkan di chat.
