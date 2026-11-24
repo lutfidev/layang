@@ -4,6 +4,7 @@ extends Node2D
 ## (bubbles + dark shadow on the surface). Drawn in world coordinates.
 
 const WARN_TIME := 1.0
+const FIRST_WARN_TIME := 1.4      # first sea of a run: extra time for newcomers
 const JUMP_TIME := 1.1
 const PEAK_ABOVE_WATER := 600.0
 const START_DEPTH := 90.0          # head starts/ends this far below the surface
@@ -18,6 +19,7 @@ const BELLY := Color("#ffd29a")
 var state := "idle"                # idle | warn | jump
 var target_x := 0.0
 var t := 0.0
+var warn_time := WARN_TIME
 var _anim := 0.0
 
 
@@ -29,8 +31,9 @@ func jumps_for_island(k: int) -> int:
 	return mini(1 + k / 2, 3)
 
 
-func arm(x: float) -> void:
+func arm(x: float, warn: float = WARN_TIME) -> void:
 	state = "warn"
+	warn_time = warn
 	target_x = x
 	t = 0.0
 	Sfx.play("blub")
@@ -50,7 +53,7 @@ func update(delta: float, bird_center: Vector2) -> bool:
 	t += delta
 	queue_redraw()
 	if state == "warn":
-		if t >= WARN_TIME:
+		if t >= warn_time:
 			state = "jump"
 			t = 0.0
 		return false
@@ -78,7 +81,7 @@ func _draw() -> void:
 		return
 	var wy := Terrain.WATER_Y
 	if state == "warn":
-		var k := clampf(t / WARN_TIME, 0.0, 1.0)
+		var k := clampf(t / warn_time, 0.0, 1.0)
 		var sx := target_x - SPAN * 0.5
 		Art.ellipse(self, Vector2(sx, wy + 6.0), 70.0 + 50.0 * k, 14.0 + 8.0 * k, Color(0.08, 0.03, 0.2, 0.35 + 0.4 * k))
 		for i in 10:

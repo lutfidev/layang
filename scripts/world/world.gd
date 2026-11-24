@@ -42,6 +42,8 @@ var _dusk := 0.0
 var _in_sea := false
 var _jumps_left := 0
 var _jump_cd := 0.0
+var _ai_rng: RandomNumberGenerator
+var _ai_react := -1.0
 
 
 func _ready() -> void:
@@ -157,11 +159,17 @@ func _update_hazards(delta: float) -> void:
 	_in_sea = over_sea
 	_jump_cd -= delta
 	if over_sea and _jumps_left > 0 and _jump_cd <= 0.0 and monster.state == "idle":
-		var tx := x + bird.vel.x * (SeaMonster.WARN_TIME + 0.55)
-		if terrain.is_sea_at(tx - SeaMonster.SPAN * 0.5) and terrain.is_sea_at(tx + SeaMonster.SPAN * 0.5):
-			monster.arm(tx)
+		var warn := SeaMonster.FIRST_WARN_TIME if terrain.island_at(x) == 0 else SeaMonster.WARN_TIME
+		var half := SeaMonster.SPAN * 0.5
+		var sea_end := x
+		while terrain.is_sea_at(sea_end + 20.0) and sea_end < x + 8000.0:
+			sea_end += 20.0
+		# aim where the bird will be, but keep the whole arc over the water
+		var tx := minf(x + bird.vel.x * (warn + 0.55), sea_end - half)
+		if tx - half > x + 60.0:
+			monster.arm(tx, warn)
 			_jumps_left -= 1
-			_jump_cd = SeaMonster.WARN_TIME + SeaMonster.JUMP_TIME + 0.5
+			_jump_cd = warn + SeaMonster.JUMP_TIME + 0.5
 	if monster.update(delta, bird.center()):
 		_die("monster")
 	elif over_sea and bird.center().y > Terrain.WATER_Y:
@@ -184,15 +192,32 @@ func clear_hazards() -> void:
 	_jump_cd = 0.0
 
 
+## Autopilot (menu, shop, balance sim): skims ~70 px over the hills, cruises over the sea,
+## and climbs out of reach when the sea monster warns, after a seeded, sometimes slow reaction.
 func _ai_hold() -> bool:
-	var x := bird.position.x
-	var look := x + clampf(bird.vel.x * 0.07, 20.0, 150.0)
-	var s := terrain.slope_at(look)
-	if bird.on_ground:
-		return s > 0.0
-	var h := terrain.height_at(look)
-	var height_above := h - bird.position.y
-	return s > 0.04 and bird.vel.y > -80.0 and height_above < 900.0
+	if _ai_rng == null:
+		_ai_rng = RandomNumberGenerator.new()
+		_ai_rng.seed = run_seed * 31 + 7
+	var b := bird
+	var x := b.position.x
+	var vx := maxf(b.vel.x, 200.0)
+	var target: float
+	if terrain.is_sea_at(x) or terrain.is_sea_at(x + vx * 0.6):
+		target = Terrain.WATER_Y - 450.0
+		if monster.state == "warn" and _ai_react < 0.0:
+			_ai_react = 0.15 + pow(_ai_rng.randf(), 4.0) * 1.2
+		if monster.state == "idle":
+			_ai_react = -1.0
+		var reacting := monster.state == "jump" or (monster.state == "warn" and monster.t >= _ai_react)
+		if reacting and monster.target_x + SeaMonster.SPAN > x:
+			target = Terrain.WATER_Y - SeaMonster.PEAK_ABOVE_WATER - 140.0
+	else:
+		var top := terrain.height_at(x)
+		for i in range(1, 7):
+			top = minf(top, terrain.height_at(x + vx * 0.12 * i))
+		target = minf(top, Terrain.WATER_Y) - 70.0
+	var predicted := b.position.y + b.vel.y * 0.2
+	return predicted > target
 
 
 func _change_biome(b: Dictionary) -> void:

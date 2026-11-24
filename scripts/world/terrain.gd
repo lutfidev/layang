@@ -132,7 +132,7 @@ func _generate_island() -> void:
 	var diff := float(min(k + start_island * 0.5, 10))
 	var amp := 1.0 + diff * 0.07
 	var wid := 1.0 + diff * 0.035
-	var hills := 15 + int(min(k, 6)) * 2
+	var hills := 9 + int(min(k, 6))
 	var biome: Dictionary = Biomes.get_biome(start_island + k)
 
 	if k == 0:

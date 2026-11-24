@@ -111,3 +111,26 @@ func test_no_hazards_in_menu_world() -> String:
 	if not deaths.is_empty():
 		return "died in menu world"
 	return "" if w.bird.position.y < Terrain.WATER_Y else "bird under water y=%f" % w.bird.position.y
+
+
+func test_fast_bird_still_gets_a_jump() -> String:
+	var w := _world()
+	_put(w, _sea_start(w) + 20.0, Terrain.WATER_Y - 450.0)
+	w.bird.fever = true
+	w.bird.vel.x = Bird.SPEED_MAX * 1.3
+	var armed := false
+	for i in int(3.0 / DT):
+		w.bird.position.y = Terrain.WATER_Y - 450.0
+		w.bird.vel.y = 0.0
+		w._physics_process(DT)
+		if w.monster.state != "idle":
+			armed = true
+			break
+		if not w.terrain.is_sea_at(w.bird.position.x):
+			break
+	if not armed:
+		return "no jump for a fast bird over the first sea"
+	var tx := w.monster.target_x
+	if not (w.terrain.is_sea_at(tx - SeaMonster.SPAN * 0.5) and w.terrain.is_sea_at(tx + SeaMonster.SPAN * 0.5)):
+		return "arc not over the sea: tx=%f" % tx
+	return ""
