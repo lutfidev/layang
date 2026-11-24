@@ -241,3 +241,49 @@ func test_autopilot_clears_canopies() -> String:
 		if at < end_x:
 			return "seed %d: only reached x=%.0f" % [s, at]
 	return ""
+
+
+# ---------------------------------------------------------------- perbaikan temuan (Task 4)
+
+func test_canopy_death_burst_color() -> String:
+	var w := _world(4242)
+	var c: Dictionary = _on(w, 0)[0]
+	var r := _fly(w, c, float(c.x0) - 400.0, 0.0, true, 500.0, false, func(_b: Bird) -> bool: return false)
+	var want: Color = w.canopy.hit_color
+	var found := false
+	for ch in w.get_children():
+		if ch is CPUParticles2D and (ch as CPUParticles2D).color_ramp.get_color(1).is_equal_approx(want):
+			found = true
+	_free(w)
+	if r[0] != ["hutan"]:
+		return "deaths=%s" % [r[0]]
+	return "" if found else "no death burst in Canopy.hit_color"
+
+
+func test_canopy_redraw_only_on_screen() -> String:
+	var w := _world(4242)
+	var cv := w.canopy
+	var c: Dictionary = _on(w, 0)[0]
+	var far := float(c.x0) - 5000.0
+	cv.view_left = far - 640.0
+	cv.view_right = far + 640.0
+	cv.redraw_requests = 0
+	for i in 10:
+		cv.update(DT, Vector2(far, -200.0), far, false)
+	var off: int = cv.redraw_requests
+	cv.view_left = float(c.x0) - 300.0
+	cv.view_right = float(c.x0) + 980.0
+	for i in 10:
+		cv.update(DT, Vector2(far, -200.0), far, false)
+	var on: int = cv.redraw_requests - off
+	cv.view_left = far - 640.0
+	cv.view_right = far + 640.0
+	for i in 10:
+		cv.update(DT, Vector2(far, -200.0), far, false)
+	var after: int = cv.redraw_requests - off - on
+	_free(w)
+	if off != 0:
+		return "%d redraws with no tunnel on screen" % off
+	if on != 10:
+		return "%d redraws with a tunnel on screen, want 10" % on
+	return "" if after == 1 else "%d redraws after it left the screen, want 1 (clear)" % after

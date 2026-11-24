@@ -293,7 +293,14 @@ func test_hutan_warns_once() -> String:
 		w._physics_process(DT)
 		if g.lbl_popup.text == "Awas lorong hutan!":
 			shown += 1
-	return "" if shown > 0 else "popup=%s" % g.lbl_popup.text
+	if shown == 0:
+		return "popup=%s" % g.lbl_popup.text
+	# a second approach (next tunnel) does not warn again
+	g.lbl_popup.text = ""
+	var c2: Dictionary = w.terrain.canopies[1]
+	w.bird.position = Vector2(float(c2.x0) - 1300.0, w.terrain.height_at(float(c2.x0) - 1300.0) - 150.0)
+	_frames(g, 0.3)
+	return "" if g.lbl_popup.text != "Awas lorong hutan!" else "warned twice"
 
 
 func test_continue_skips_canopy() -> String:

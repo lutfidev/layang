@@ -33,6 +33,8 @@ var _spotted := false
 var _first := 0
 var _passed_upto := 0          # kites before this index are already counted as passed
 var _skip_passes := false      # set by reset_current: the respawn jump past a kite is not a pass
+var _seen_inside := false      # the bird was sampled inside the span of kites[_passed_upto]
+var _went_under := false       # ... and below the body at least once: flying over is not a pass
 
 
 func _ready() -> void:
@@ -97,9 +99,20 @@ func update(delta: float, bird_center: Vector2, bird_x: float) -> bool:
 		if bird_center.x <= sp.y and hits(k, _anim, bird_center):
 			hit_color = COLORS[int(k.color)][0]
 			return true
+	if _passed_upto < kites.size():
+		var kp: Dictionary = kites[_passed_upto]
+		var spp := span(kp)
+		if bird_center.x >= spp.x and bird_center.x <= spp.y:
+			_seen_inside = true
+			if bird_center.y > body_center(kp, _anim).y:
+				_went_under = true
 	while _passed_upto < kites.size() and span(kites[_passed_upto]).y < bird_center.x:
+		# a frame step that jumps the whole span (FEVER) judges by where the bird is now
+		var under := _went_under or (not _seen_inside and bird_center.y > body_center(kites[_passed_upto], _anim).y)
 		_passed_upto += 1
-		if not _skip_passes:
+		_seen_inside = false
+		_went_under = false
+		if under and not _skip_passes:
 			passed.emit()
 	_skip_passes = false
 	return false

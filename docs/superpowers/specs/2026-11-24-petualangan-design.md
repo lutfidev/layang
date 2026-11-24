@@ -180,8 +180,14 @@ tumbuh) dicatat sebagai tujuan jangka panjang, dan peta pulau ini nanti bisa men
   urutan berputar dari awal. Tiga misi awal: skim 10, koin 150, lolos 5.
 - Misi koin menghitung koin yang diambil (2 per koin saat FEVER), bukan bonus pulau.
 - Layangan yang dilewati dihitung untuk misi (`pass` dan `pass_layangan`) tanpa popup atau poin, karena layangan muncul
-  sering. Lompatan respawn melewati layangan setelah Lanjut tidak dihitung.
-- Keluar lewat jeda, baik "Ulang" maupun "Menu Utama", tetap membayar misi yang selesai.
+  sering. Hanya layangan yang dilewati **di bawah** badannya yang dihitung; terbang tinggi di atasnya aman tapi tidak
+  dihitung. Lompatan respawn melewati layangan setelah Lanjut tidak dihitung.
+- Keluar lewat jeda, baik "Ulang" maupun "Menu Utama", tetap membayar misi yang selesai dan menyimpan koin run itu,
+  lalu run berhenti (tidak ada yang bergerak di bawah layar pudar).
+- Layar hasil memuat semua misi yang dibayar dalam run itu, termasuk yang dibayar sebelum Lanjut. Barisnya tetap 3 misi
+  awal run itu (dengan progres terbaru); misi pengganti tidak ditampilkan.
+- Koin yang terambil setelah "Level selesai!" (magnet FEVER) tidak dihitung di mana pun. Burung yang kena rintangan di
+  frame yang sama saat melewati gerbang tetap menyelesaikan level dan terus meluncur.
 - Panel Misi ada di samping panel hasil, panel selesai, dan panel jeda (bukan di dalamnya), supaya tombol tidak terdorong
   keluar layar. Layar hasil menampilkan 3 misi run itu; misi pengganti terlihat di menu dan jeda.
 - Burung di menu digeser ke `bird_screen_x = 0.56`, supaya terbang di antara tombol dan panel Misi.

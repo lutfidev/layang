@@ -469,3 +469,71 @@ func test_map_scroll_passes_touch() -> String:
 		stack.append_array(n.get_children())
 	_free_node(m)
 	return bad
+
+
+# ---------------------------------------------------------------- level end edge cases (perbaikan temuan, Task 1)
+
+func test_death_at_gate_finishes_level() -> String:
+	# a hazard hitting the bird on the very frame it reaches the gate must still finish the level
+	var keep := Game.save_data()
+	var g := _level_game("sawah-1")
+	var w: World = g.world
+	w.bird.position.x = w.terrain.island_finish[0] + 2.0
+	w._die("layangan")
+	var x0 := w.bird.position.x
+	for i in 30:
+		w._physics_process(DT)
+	var r := ""
+	if g.state != "done":
+		r = "state %s, want done" % g.state
+	elif w.bird.position.x <= x0:
+		r = "bird frozen at the gate after the hit"
+	elif not _has_text(g.result_panel, "Level selesai!"):
+		r = "no level done title"
+	_free_node(g)
+	Game.apply_save(keep)
+	return r
+
+
+func test_coins_after_done_ignored() -> String:
+	var keep := Game.save_data()
+	var g := _level_game("sawah-1")
+	var w: World = g.world
+	g._finish_level()
+	Game.missions = [{"id": "coins_150", "progress": 0}]
+	var coins0: int = g.coins_run
+	w.item_collected.emit(0, w.bird.position)
+	var p := int(Game.missions[0].progress)
+	var r := ""
+	if g.coins_run != coins0:
+		r = "coins_run %d -> %d after the level was done" % [coins0, g.coins_run]
+	elif p != 0:
+		r = "coin mission moved after the level was done: %d" % p
+	_free_node(g)
+	Game.apply_save(keep)
+	return r
+
+
+func test_monster_reset_when_finished() -> String:
+	var w := _level_world(Levels.get_level("sawah-1"))
+	w.monster.arm(w.bird.position.x + 400.0, 0.1)
+	w.monster.update(0.2, Vector2(-99999.0, -99999.0))   # past the warning: jumping
+	var jumping := w.monster.state == "jump"
+	w.finished = true
+	w.running = true
+	for i in 30:
+		w._physics_process(DT)
+	var st := w.monster.state
+	_free(w)
+	if not jumping:
+		return "setup: monster not jumping"
+	return "" if st == "idle" else "monster stuck in %s after the level finished" % st
+
+
+func test_menu_clears_current_level() -> String:
+	Game.current_level = "sawah-1"
+	var m := _scene("res://scenes/main_menu.tscn")
+	var lv := Game.current_level
+	_free_node(m)
+	Game.current_level = ""
+	return "" if lv == "" else "current_level still %s on the menu" % lv

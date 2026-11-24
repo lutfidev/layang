@@ -42,8 +42,9 @@ var end_cause := ""         # laut | monster | ombak | layangan (batas = sim cap
 var _high_awarded := false
 var fever_t := 0.0
 var continued := false
-var missions_done: Array = []   # missions paid at the end of this run: [{id, reward}]
-var missions_run: Array = []    # the active missions as they were when the run ended (shown on the results)
+var missions_done: Array = []   # every mission paid this run (also before a "Lanjut"): [{id, reward}]
+var missions_run: Array = []    # the run's missions, snapshot at its first settle (shown on the results)
+var goto_scene: Callable = Game.goto   # scene change used when leaving from the pause panel (tests swap it)
 var coin_chain := 0
 var coin_chain_t := 0.0
 var start_x := 0.0
@@ -253,6 +254,8 @@ func _on_island(k: int, biome: Dictionary) -> void:
 
 
 func _on_item(_kind: int, pos: Vector2) -> void:
+	if state != "play":
+		return   # e.g. a fever magnet dragging coins in after "Level selesai!": counts nowhere
 	if not level.is_empty() and pos.x < world.terrain.island_finish[0]:
 		level_coins += 1
 	var gained := 2 if world.bird.fever else 1
@@ -333,8 +336,13 @@ func _on_kite_spotted() -> void:
 
 
 func _on_died(cause: String) -> void:
-	if state == "play":
-		_finish(cause)
+	if state != "play":
+		return
+	if not level.is_empty() and world.bird.position.x >= world.terrain.island_finish[0]:
+		world.dead = false   # hit on the frame it reached the gate: the level still counts and the bird glides on
+		_finish_level()
+		return
+	_finish(cause)
 
 
 ## "TERBANG TINGGI!" once per flight when the bird climbs high above the ground / water.
@@ -572,15 +580,28 @@ func _toggle_pause() -> void:
 	v.add_child(b3)
 
 
-## Leaving mid-run from the pause panel still pays finished missions.
+## Leaving mid-run from the pause panel banks the run's coins, pays finished missions and stops the run.
 func _leave_run(path: String) -> void:
+	state = "over"
+	world.running = false
+	var earned := coins_run - coins_banked
+	coins_banked = coins_run
+	Game.add_coins(earned)
 	_settle_missions()
-	Game.goto(path)
+	goto_scene.call(path)
 
 
+## Pays finished missions. Called at every run end (also after "Lanjut"): the results keep the missions
+## the run started with, with their latest progress, and every payout of the run; replacements are not shown.
 func _settle_missions() -> void:
-	missions_run = Game.missions.duplicate(true)
-	missions_done = Game.settle_missions()
+	if missions_run.is_empty():
+		missions_run = Game.missions.duplicate(true)
+	else:
+		for a in missions_run:
+			for b in Game.missions:
+				if b.id == a.id:
+					a.progress = b.progress
+	missions_done.append_array(Game.settle_missions())
 
 
 ## The run's missions for the results panel, with the reward of the ones just paid.

@@ -9,6 +9,7 @@ var logo: Label
 
 
 func _ready() -> void:
+	Game.current_level = ""   # back on the menu: no adventure level is being played
 	world = World.new()
 	world.autoplay = true
 	world.input_enabled = false

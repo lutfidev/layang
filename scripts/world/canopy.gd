@@ -20,11 +20,13 @@ signal passed
 var terrain: Terrain
 var view_left := 0.0
 var view_right := 0.0
-var hit_color := Color("#2f6b3a")
+var hit_color := Color("#2f6b3a")   # death burst colour (World._die)
+var redraw_requests := 0     # queue_redraw calls made by update (tests)
 var _anim := 0.0
 var _spotted := false
 var _first := 0
 var _inside := -1            # index of the tunnel the bird is (or last was) flying through
+var _drawn := false          # the last redraw showed a tunnel
 
 
 func _ready() -> void:
@@ -50,8 +52,12 @@ static func hits(tr: Terrain, c: Dictionary, p: Vector2, on_ground: bool) -> boo
 ## Animates the tunnels; returns true when one hits the bird.
 func update(delta: float, bird_center: Vector2, bird_x: float, bird_on_ground: bool) -> bool:
 	_anim += delta
-	queue_redraw()
 	var cs: Array = terrain.canopies
+	var shown := _any_on_screen()
+	if shown or _drawn:   # one more redraw after the last tunnel leaves clears it
+		queue_redraw()
+		redraw_requests += 1
+	_drawn = shown
 	while _first < cs.size() and float(cs[_first].x1) < bird_x - 600.0:
 		_first += 1
 	var hit := false
@@ -82,6 +88,16 @@ func safe_x_after(x: float) -> float:
 			if _inside == i:
 				_inside = -1
 	return x
+
+
+## True when a tunnel overlaps the drawn range (same margins as _draw).
+func _any_on_screen() -> bool:
+	for c in terrain.canopies:   # from the start, like _draw: _first can skip a tunnel still on screen
+		if float(c.x0) > view_right + 400.0:
+			return false
+		if float(c.x1) >= view_left - 400.0:
+			return true
+	return false
 
 
 func reset_current() -> void:

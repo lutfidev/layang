@@ -1,6 +1,6 @@
 # Perbaikan Temuan Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Menyelesaikan semua temuan kecil yang ditunda dari review akhir PR #7 (lorong kanopi), PR #9 (peta
 petualangan), dan PR #10 (misi), sebelum langkah semburan lava dimulai.
@@ -17,7 +17,12 @@ tempatnya (`game.gd`, `game_state.gd`, `canopy.gd`, `world.gd`, `kite.gd`, tes, 
 
 ## Status
 
-- Belum dimulai. Pemilik repo meminta langkah ini dikerjakan **sebelum** semburan lava (2026-11-24).
+- **Selesai** (2026-11-24, branch `feat/perbaikan-temuan`). Semua temuan T1-T13 diperbaiki. Pemilik repo meminta
+  langkah ini dikerjakan **sebelum** semburan lava.
+- Catatan: T10 langsung lulus (kekurangan tes, bukan bug). T11 dibuat umum: `World._die` memakai `hit_color` dari
+  setiap rintangan pulau. Review akhir menemukan burung membeku di gerbang pada kasus T1 (`world.dead` masih true),
+  dan itu sudah diperbaiki. Baris `ERROR: 2 resources still in use at exit` di akhir sim sudah ada sebelum langkah ini
+  (muncul karena `quit()` dipanggil di tengah run).
 
 ## Global Constraints
 - Ikuti alur git di CLAUDE.md: branch `feat/perbaikan-temuan`, PR `feat: perbaikan temuan`.
@@ -55,56 +60,56 @@ tempatnya (`game.gd`, `game_state.gd`, `canopy.gd`, `world.gd`, `kite.gd`, tes, 
 
 **Files:** `scripts/ui/game.gd`, `scripts/ui/main_menu.gd`, `scripts/world/world.gd`, `tests/test_levels.gd`
 
-- [ ] **Step 1: Tes gagal:**
+- [x] **Step 1: Tes gagal:**
   - `test_death_at_gate_finishes_level`: posisikan burung tepat di gerbang dan picu `bird_died` → `state == "done"`.
   - `test_coins_after_done_ignored`: setelah `_finish_level`, emit `item_collected` → `coins_run` dan progres misi koin tidak berubah.
   - `test_monster_reset_when_finished`.
   - `test_menu_clears_current_level`.
-- [ ] **Step 2:** Jalankan, FAIL.
-- [ ] **Step 3:** Perbaikan sesuai tabel.
-- [ ] **Step 4:** PASS, dan seluruh suite `failed=0`.
-- [ ] **Step 5: Commit** `fix: level end edge cases (death at the gate, coins after done, monster, current level)`
+- [x] **Step 2:** Jalankan, FAIL.
+- [x] **Step 3:** Perbaikan sesuai tabel.
+- [x] **Step 4:** PASS, dan seluruh suite `failed=0`.
+- [x] **Step 5: Commit** `fix: level end edge cases (death at the gate, coins after done, monster, current level)`
 
 ### Task 2: Misi dan keluar lewat jeda (T5, T6, T7, T9)
 
 **Files:** `scripts/ui/game.gd`, `tests/test_missions.gd`
 
-- [ ] **Step 1: Tes gagal:**
+- [x] **Step 1: Tes gagal:**
   - `test_mission_results_keep_first_payout`: misi selesai, kalah, Lanjut, kalah lagi → layar hasil masih memuat "Selesai! +N" untuk misi pertama.
   - `test_mission_pause_exit_banks_coins`: `coins_run` 7, lalu "Menu Utama" → `Game.coins` +7 plus hadiah.
   - `test_mission_pause_exit_stops_run`: setelah tombol, `state == "over"` dan `world.running == false`.
   - Ubah `test_mission_pause_menu_settles` supaya memakai `goto_scene` palsu.
-- [ ] **Step 2:** FAIL.
-- [ ] **Step 3:** Perbaikan sesuai tabel.
-- [ ] **Step 4:** PASS, dan seluruh suite `failed=0`.
-- [ ] **Step 5: Commit** `fix: pause exit banks coins and stops the run; results keep every mission paid this run`
+- [x] **Step 2:** FAIL.
+- [x] **Step 3:** Perbaikan sesuai tabel.
+- [x] **Step 4:** PASS, dan seluruh suite `failed=0`.
+- [x] **Step 5: Commit** `fix: pause exit banks coins and stops the run; results keep every mission paid this run`
 
 ### Task 3: Layangan dihitung hanya kalau dilewati di bawah (T8)
 
 **Files:** `scripts/world/kite.gd`, `tests/test_missions.gd`
 
-- [ ] **Step 1: Tes gagal:** `test_mission_kite_over_not_counted`: burung melintas di atas badan layangan (y = `peak_y - 600`) → tidak ada `passed`. `test_mission_kite_pass_signal` (di bawah) tetap 2.
-- [ ] **Step 2:** FAIL.
-- [ ] **Step 3:** Perbaikan sesuai tabel.
-- [ ] **Step 4:** PASS. Sim Sawah (`--island=0 --seed=4242 --autoplay --sim --fresh --nosave`) tanpa error.
-- [ ] **Step 5: Commit** `fix: a kite only counts as passed when the bird goes under it`
+- [x] **Step 1: Tes gagal:** `test_mission_kite_over_not_counted`: burung melintas di atas badan layangan (y = `peak_y - 600`) → tidak ada `passed`. `test_mission_kite_pass_signal` (di bawah) tetap 2.
+- [x] **Step 2:** FAIL.
+- [x] **Step 3:** Perbaikan sesuai tabel.
+- [x] **Step 4:** PASS. Sim Sawah (`--island=0 --seed=4242 --autoplay --sim --fresh --nosave`) tanpa error.
+- [x] **Step 5: Commit** `fix: a kite only counts as passed when the bird goes under it`
 
 ### Task 4: Lorong hutan (T10, T11, T12, T13)
 
 **Files:** `scripts/world/canopy.gd`, `scripts/world/world.gd`, `tests/test_game_rules.gd`, `tests/test_canopy.gd`, `docs/superpowers/specs/2026-11-24-rintangan-pulau-design.md`
 
-- [ ] **Step 1: Tes gagal:**
+- [x] **Step 1: Tes gagal:**
   - `test_hutan_warns_once`: lorong kedua tidak memunculkan peringatan lagi.
   - `test_canopy_death_burst_color`: percikan saat mati memakai `Canopy.hit_color`, misalnya dengan mencatat warna burst terakhir di `World`.
   - `test_canopy_redraw_only_on_screen`: tanpa lorong di layar, `update` tidak meminta redraw. Pakai penanda `_needs_draw` atau penghitung.
-- [ ] **Step 2:** FAIL. Catatan: `test_hutan_warns_once` mungkin langsung PASS, karena temuan ini soal tes yang kurang, bukan bug. Kalau begitu, catat di ledger dan lanjutkan.
-- [ ] **Step 3:** Perbaikan sesuai tabel. Spec "Antarmuka bersama" disamakan dengan `canopy.gd`.
-- [ ] **Step 4:** PASS, dan seluruh suite `failed=0`. Screenshot Hutan (perintah di CLAUDE.md, delay 7) tetap terlihat benar.
-- [ ] **Step 5: Commit** `fix: canopy warns once, uses its hit colour and redraws only on screen; shared interface spec matches code`
+- [x] **Step 2:** FAIL. Catatan: `test_hutan_warns_once` mungkin langsung PASS, karena temuan ini soal tes yang kurang, bukan bug. Kalau begitu, catat di ledger dan lanjutkan.
+- [x] **Step 3:** Perbaikan sesuai tabel. Spec "Antarmuka bersama" disamakan dengan `canopy.gd`.
+- [x] **Step 4:** PASS, dan seluruh suite `failed=0`. Screenshot Hutan (perintah di CLAUDE.md, delay 7) tetap terlihat benar.
+- [x] **Step 5: Commit** `fix: canopy warns once, uses its hit colour and redraws only on screen; shared interface spec matches code`
 
 ### Task 5: Verifikasi + dokumen
 
-- [ ] **Step 1:** Cek wajib bersih.
-- [ ] **Step 2:** Sim Tanpa Batas seed 11 (`cause=batas`) dan sim 9 level siap (`cause=selesai`).
-- [ ] **Step 3:** Centang plan, set status selesai, dan catat keputusan baru di spec terkait.
-- [ ] **Step 4: Commit** `docs: findings step notes, plan status`, lalu push dan buat PR.
+- [x] **Step 1:** Cek wajib bersih.
+- [x] **Step 2:** Sim Tanpa Batas seed 11 (`cause=batas`) dan sim 9 level siap (`cause=selesai`).
+- [x] **Step 3:** Centang plan, set status selesai, dan catat keputusan baru di spec terkait.
+- [x] **Step 4: Commit** `docs: findings step notes, plan status`, lalu push dan buat PR.

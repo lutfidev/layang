@@ -229,6 +229,38 @@ func test_mission_kite_pass_signal() -> String:
 	return r
 
 
+func test_mission_kite_over_not_counted() -> String:
+	# flying high over a kite is safe but is not "passing" it: only going under the body counts
+	var t := Terrain.new()
+	t.kites = [{"x": 1000.0, "peak_y": 0.0, "island": 0, "color": 0}, {"x": 2000.0, "peak_y": 0.0, "island": 0, "color": 1}]
+	var k := Kite.new()
+	k.terrain = t
+	runner.add_child(k)
+	var n := [0]
+	k.passed.connect(func(): n[0] += 1)
+	var x := 0.0
+	var hit := false
+	while x < 2600.0:
+		hit = k.update(DT, Vector2(x, -600.0), x) or hit
+		x += 6.0
+	# FEVER-sized steps under the tails still count
+	var k2 := Kite.new()
+	k2.terrain = t
+	runner.add_child(k2)
+	var n2 := [0]
+	k2.passed.connect(func(): n2[0] += 1)
+	x = 0.0
+	while x < 2600.0:
+		k2.update(DT, Vector2(x, -60.0), x)
+		x += 150.0
+	t.free()
+	if hit:
+		return "bird high over the kites was hit"
+	if n[0] != 0:
+		return "flying over counted %d passes, want 0" % n[0]
+	return "" if n2[0] == 2 else "big steps under the tails: %d passes, want 2" % n2[0]
+
+
 func test_mission_world_forwards_kite_pass() -> String:
 	var w := World.new()
 	w.input_enabled = false
@@ -287,25 +319,78 @@ func test_mission_endless_island_in_endless() -> String:
 	return "" if p == 3 else "progress %d, want 3" % p
 
 
+## Presses a pause-panel button with a fake scene change; returns the paths it was asked to go to.
+func _press_pause(g: Node, text: String) -> Array:
+	var went: Array = []
+	g.goto_scene = func(path: String): went.append(path)
+	g._toggle_pause()
+	var b := _find_button(g.pause_panel, text)
+	if b:
+		b.pressed.emit()
+	runner.get_tree().paused = false
+	return went
+
+
 func test_mission_pause_menu_settles() -> String:
 	var keep := Game.save_data()
 	var g := _game()
 	_force(["skim_10"])
 	Game.missions[0].progress = 10
 	var coins0 := Game.coins
-	g._toggle_pause()
-	var b := _find_button(g.pause_panel, "Menu Utama")
+	var went := _press_pause(g, "Menu Utama")
 	var r := ""
-	if b == null:
-		r = "no Menu Utama button"
-	else:
-		b.pressed.emit()
-		if Game.coins - coins0 != 50:
-			r = "coins +%d, want +50" % (Game.coins - coins0)
-		elif _progress("skim_10") != -1:
-			r = "finished mission not replaced"
-	Game._busy = false
-	runner.get_tree().paused = false
+	if went != ["res://scenes/main_menu.tscn"]:
+		r = "went %s" % [went]
+	elif Game.coins - coins0 != 50:
+		r = "coins +%d, want +50" % (Game.coins - coins0)
+	elif _progress("skim_10") != -1:
+		r = "finished mission not replaced"
+	Game.apply_save(keep)
+	return r
+
+
+func test_mission_pause_exit_banks_coins() -> String:
+	var keep := Game.save_data()
+	var g := _game()
+	_force(["skim_10"])
+	Game.missions[0].progress = 10
+	g.coins_run = 7
+	var coins0 := Game.coins
+	_press_pause(g, "Menu Utama")
+	var gain := Game.coins - coins0
+	Game.apply_save(keep)
+	return "" if gain == 57 else "coins +%d, want +57 (7 run coins + 50 reward)" % gain
+
+
+func test_mission_pause_exit_stops_run() -> String:
+	var keep := Game.save_data()
+	var g := _game()
+	_press_pause(g, "Ulang")
+	var r := ""
+	if g.state != "over":
+		r = "state %s, want over" % g.state
+	elif g.world.running:
+		r = "world still running under the fade"
+	Game.apply_save(keep)
+	return r
+
+
+func test_mission_results_keep_first_payout() -> String:
+	var keep := Game.save_data()
+	var g := _game()
+	_force(["skim_10", "coins_150", "pass_5"])
+	Game.missions[0].progress = 10
+	g._finish("laut")
+	g._continue_run()
+	g.world.item_collected.emit(0, g.world.bird.position)
+	g._finish("laut")
+	var r := ""
+	if _count_label(g.result_panel, "Selesai! +50") != 1:
+		r = "first payout missing from the last results"
+	elif _count_label(g.result_panel, Missions.label(Missions.get_mission("coins_150"))) != 1:
+		r = "coins mission row missing"
+	elif g.missions_done.size() != 1:
+		r = "missions_done %s" % [g.missions_done]
 	Game.apply_save(keep)
 	return r
 
