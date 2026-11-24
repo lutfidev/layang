@@ -229,6 +229,38 @@ func test_mission_kite_pass_signal() -> String:
 	return r
 
 
+func test_mission_kite_over_not_counted() -> String:
+	# flying high over a kite is safe but is not "passing" it: only going under the body counts
+	var t := Terrain.new()
+	t.kites = [{"x": 1000.0, "peak_y": 0.0, "island": 0, "color": 0}, {"x": 2000.0, "peak_y": 0.0, "island": 0, "color": 1}]
+	var k := Kite.new()
+	k.terrain = t
+	runner.add_child(k)
+	var n := [0]
+	k.passed.connect(func(): n[0] += 1)
+	var x := 0.0
+	var hit := false
+	while x < 2600.0:
+		hit = k.update(DT, Vector2(x, -600.0), x) or hit
+		x += 6.0
+	# FEVER-sized steps under the tails still count
+	var k2 := Kite.new()
+	k2.terrain = t
+	runner.add_child(k2)
+	var n2 := [0]
+	k2.passed.connect(func(): n2[0] += 1)
+	x = 0.0
+	while x < 2600.0:
+		k2.update(DT, Vector2(x, -60.0), x)
+		x += 150.0
+	t.free()
+	if hit:
+		return "bird high over the kites was hit"
+	if n[0] != 0:
+		return "flying over counted %d passes, want 0" % n[0]
+	return "" if n2[0] == 2 else "big steps under the tails: %d passes, want 2" % n2[0]
+
+
 func test_mission_world_forwards_kite_pass() -> String:
 	var w := World.new()
 	w.input_enabled = false
