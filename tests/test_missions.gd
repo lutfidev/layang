@@ -166,3 +166,162 @@ func test_mission_old_save() -> String:
 		r = "bad save entries kept %s" % [Game.missions]
 	Game.apply_save(keep)
 	return r
+
+
+# ---------------------------------------------------------------- game events (Task 2)
+
+func _game(level_id: String = "") -> Node:
+	Game.current_level = level_id
+	var g: Node = load("res://scenes/game.tscn").instantiate()
+	runner.add_child(g)
+	Game.current_level = ""
+	g._start()
+	return g
+
+
+func _progress(id: String) -> int:
+	for a in Game.missions:
+		if a.id == id:
+			return int(a.progress)
+	return -1
+
+
+func _find_button(n: Node, text: String) -> Button:
+	if n is Button and (n as Button).text == text:
+		return n
+	for c in n.get_children():
+		var b := _find_button(c, text)
+		if b:
+			return b
+	return null
+
+
+func test_mission_kite_pass_signal() -> String:
+	var t := Terrain.new()
+	t.kites = [{"x": 1000.0, "peak_y": 0.0, "island": 0, "color": 0}, {"x": 2000.0, "peak_y": 0.0, "island": 0, "color": 1}]
+	var k := Kite.new()
+	k.terrain = t
+	runner.add_child(k)
+	var n := [0]
+	k.passed.connect(func(): n[0] += 1)
+	var x := 0.0
+	var hit := false
+	while x < 2600.0:
+		hit = k.update(DT, Vector2(x, -60.0), x) or hit
+		x += 6.0
+	var r := ""
+	if hit:
+		r = "bird under the tails was hit"
+	elif n[0] != 2:
+		r = "passed %d times, want 2" % n[0]
+	else:
+		# respawn past a kite after "Lanjut" is not a pass
+		var k2 := Kite.new()
+		k2.terrain = t
+		runner.add_child(k2)
+		k2.passed.connect(func(): n[0] += 1)
+		k2.update(DT, Vector2(900.0, -60.0), 900.0)
+		k2.reset_current()
+		k2.update(DT, Vector2(1300.0, -60.0), 1300.0)
+		if n[0] != 2:
+			r = "respawn past a kite counted as a pass"
+	t.free()
+	return r
+
+
+func test_mission_world_forwards_kite_pass() -> String:
+	var w := World.new()
+	w.input_enabled = false
+	runner.add_child(w)
+	var got: Array = []
+	w.hazard_passed.connect(func(c: String): got.append(c))
+	w.kite.passed.emit()
+	return "" if got == ["layangan"] else "hazard_passed %s" % [got]
+
+
+func test_mission_events_reach_missions() -> String:
+	var keep := Game.save_data()
+	var g := _game()
+	_force(["skim_10", "coins_150", "pass_ombak_3"])
+	var w: World = g.world
+	w.bird_skimmed.emit(0.5)
+	w.item_collected.emit(0, w.bird.position)
+	w.item_collected.emit(0, w.bird.position)
+	w.wave_passed.emit()
+	var got := [_progress("skim_10"), _progress("coins_150"), _progress("pass_ombak_3")]
+	_force(["pass_5", "pass_hutan_2", "pass_layangan_3"])
+	w.hazard_passed.emit("hutan")
+	w.hazard_passed.emit("layangan")
+	var got2 := [_progress("pass_5"), _progress("pass_hutan_2"), _progress("pass_layangan_3")]
+	Game.apply_save(keep)
+	if got != [1, 2, 1]:
+		return "skim/coins/ombak %s, want [1, 2, 1]" % [got]
+	return "" if got2 == [2, 1, 1] else "pass/hutan/layangan %s, want [2, 1, 1]" % [got2]
+
+
+func test_mission_level_events() -> String:
+	var keep := Game.save_data()
+	Game.level_stars = {}
+	var g := _game("sawah-1")
+	_force(["stars_3", "level_clean_1", "endless_island_3"])
+	g.world.island_reached.emit(2, Biomes.get_biome(2))
+	var isl := _progress("endless_island_3")
+	g.level_coins_total = 10
+	g.level_coins = 10
+	g._finish_level()
+	var paid: Array = g.missions_done.map(func(d: Dictionary) -> String: return d.id)
+	Game.apply_save(keep)
+	if isl != 0:
+		return "endless_island moved in a level: %d" % isl
+	paid.sort()
+	return "" if paid == ["level_clean_1", "stars_3"] else "paid %s" % [paid]
+
+
+func test_mission_endless_island_in_endless() -> String:
+	var keep := Game.save_data()
+	var g := _game()
+	_force(["endless_island_3"])
+	g.world.island_reached.emit(2, Biomes.get_biome(2))
+	var p := _progress("endless_island_3")
+	Game.apply_save(keep)
+	return "" if p == 3 else "progress %d, want 3" % p
+
+
+func test_mission_pause_menu_settles() -> String:
+	var keep := Game.save_data()
+	var g := _game()
+	_force(["skim_10"])
+	Game.missions[0].progress = 10
+	var coins0 := Game.coins
+	g._toggle_pause()
+	var b := _find_button(g.pause_panel, "Menu Utama")
+	var r := ""
+	if b == null:
+		r = "no Menu Utama button"
+	else:
+		b.pressed.emit()
+		if Game.coins - coins0 != 50:
+			r = "coins +%d, want +50" % (Game.coins - coins0)
+		elif _progress("skim_10") != -1:
+			r = "finished mission not replaced"
+	Game._busy = false
+	runner.get_tree().paused = false
+	Game.apply_save(keep)
+	return r
+
+
+func test_mission_continue_no_double_count() -> String:
+	var keep := Game.save_data()
+	var g := _game()
+	_force(["coins_150"])
+	var w: World = g.world
+	for i in 10:
+		w.item_collected.emit(0, w.bird.position)
+	g._finish("laut")
+	g._continue_run()
+	for i in 5:
+		w.item_collected.emit(0, w.bird.position)
+	g._finish("laut")
+	var p := _progress("coins_150")
+	Game.apply_save(keep)
+	return "" if p == 15 else "coins progress %d, want 15" % p
