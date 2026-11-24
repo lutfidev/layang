@@ -28,6 +28,7 @@ const SKIM_HEIGHT := 90.0
 const SKIM_MIN_TIME := 0.6
 const RADIUS := 22.0
 
+var speed_scale := 1.0      # adventure Badai levels fly faster (Levels.TIERS[].speed)
 var terrain: Terrain
 var vel := Vector2(360, 0)
 var holding := false
@@ -112,7 +113,7 @@ func step(delta: float) -> void:
 		exhausted = false
 
 	# forward speed ramps up over distance
-	var target := lerpf(SPEED_START, SPEED_MAX, clampf(position.x / SPEED_RAMP_X, 0.0, 1.0))
+	var target := lerpf(SPEED_START, SPEED_MAX, clampf(position.x / SPEED_RAMP_X, 0.0, 1.0)) * speed_scale
 	if fever:
 		target *= 1.3
 	if on_ground:

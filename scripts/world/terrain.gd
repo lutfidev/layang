@@ -30,6 +30,8 @@ const CANOPY_VALLEY_Y := 40.0               # canopy hills are gentle: a corrido
 const CANOPY_PEAK_Y := -40.0
 
 var run_seed: int = 1
+var level_hills := -1        # adventure level: hills on island 0 (-1 = endless rules)
+var level_hazards := -1      # adventure level: signature hazards on island 0
 var start_island: int = 0
 
 var keys_x := PackedFloat32Array()
@@ -57,7 +59,11 @@ var _mesh_layer: Node2D
 var _props_layer: PropsLayer
 
 
-func setup(seed_value: int, first_island: int, coin_field: CoinField) -> void:
+func setup(seed_value: int, first_island: int, coin_field: CoinField, level: Dictionary = {}) -> void:
+	if not level.is_empty():
+		var tier := Levels.tier_of(level)
+		level_hills = int(tier.hills)
+		level_hazards = int(tier.hazards)
 	run_seed = seed_value
 	start_island = first_island
 	coins = coin_field
@@ -227,6 +233,9 @@ func _generate_island() -> void:
 	var wid := 1.0 + diff * 0.035
 	var hills := 9 + int(min(k, 6))
 	var biome: Dictionary = Biomes.get_biome(start_island + k)
+	var leveled := k == 0 and level_hills > 0
+	if leveled:
+		hills = level_hills
 
 	if k == 0:
 		_add_key(Vector2(-4200, -150), k)
@@ -240,18 +249,18 @@ func _generate_island() -> void:
 	if biome.id == "pantai":
 		var bay_rng := RandomNumberGenerator.new()
 		bay_rng.seed = run_seed * 6151 + k * 92821
-		bay_hills = pick_bay_hills(hills, bay_rng)
+		bay_hills = pick_hills(hills, level_hazards if leveled else BAYS_PER_ISLAND, bay_rng)
 	var kite_hills: Array[int] = []
 	if biome.id == "sawah":
 		var kite_rng := RandomNumberGenerator.new()
 		kite_rng.seed = run_seed * 4271 + k * 65537
-		kite_hills = pick_hills(hills, KITES_PER_ISLAND, kite_rng)
+		kite_hills = pick_hills(hills, level_hazards if leveled else KITES_PER_ISLAND, kite_rng)
 	var canopy_hills: Array[int] = []
 	if biome.id == "hutan":
 		var canopy_rng := RandomNumberGenerator.new()
 		canopy_rng.seed = run_seed * 5381 + k * 77003
 		# never the last hill: its far side is the steep drop to the launch ramp
-		canopy_hills = pick_hills(hills - 1, CANOPIES_PER_ISLAND, canopy_rng)
+		canopy_hills = pick_hills(hills - 1, level_hazards if leveled else CANOPIES_PER_ISLAND, canopy_rng)
 	var open_canopy := -1
 
 	var hill_start_key := keys_x.size() - 1
