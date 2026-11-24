@@ -146,23 +146,6 @@ func test_forward_speed_ramps() -> String:
 	return ""
 
 
-func test_sleepy_cannot_lift() -> String:
-	var b := _air(3, 0, -800)
-	b.sleepy = true
-	b.holding = true
-	b.stamina = 0.5
-	var y0 := b.position.y
-	_steps(b, 0.5)
-	if b.position.y <= y0:
-		return "sleepy bird rose"
-	if b.stamina > 0.5:
-		return "sleepy stamina regen %f" % b.stamina
-	return ""
-
-
-# ---------------------------------------------------------------- skim (NYEREMPET)
-
-## Holds the bird `above` px over the terrain for `seconds` (re-placing it every step).
 func _hover(b: Bird, above: float, seconds: float) -> void:
 	for i in int(seconds / DT):
 		b.position.y = b.terrain.height_at(b.position.x) - above

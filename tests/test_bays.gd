@@ -454,3 +454,24 @@ func _menu_silence() -> String:
 	if w.wave.state == "idle" and w.bird.position.x < bay.mid:
 		return "never reached the bay (test vacuous)"
 	return "" if Sfx._next == before else "menu world played %d sounds" % posmod(Sfx._next - before, 8)
+
+
+func test_dry_ground_after_bays_and_sea() -> String:
+	for s in SEEDS:
+		var w := _world(s)
+		var t := w.terrain
+		var err := ""
+		for bay in t.bays:
+			var x: float = t.dry_ground_after(bay.mid)
+			if t.is_water_at(x) or x < bay.water_x1 or t.kick_at(x):
+				err = "seed %d bay mid %f -> %f unsafe" % [s, bay.mid, x]
+		var sx: float = t.island_finish[0]
+		while not t.is_sea_at(sx):
+			sx += 10.0
+		var x2: float = t.dry_ground_after(sx + 100.0)
+		if t.is_water_at(x2) or t.slope_at(x2) < -0.3:
+			err = "seed %d sea -> %f unsafe" % [s, x2]
+		_free(w)
+		if err != "":
+			return err
+	return ""

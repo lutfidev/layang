@@ -1,6 +1,6 @@
 # Layang Tanpa Batas — design
 
-Status: disetujui (tahap 1 selesai di `feat/ombak-pantai`) · 2026-11-24 · lanjutan dari `2026-11-24-tahan-naik-design.md`
+Status: disetujui (tahap 1 selesai, PR #2; tahap 2 di `feat/tanpa-timer`) · 2026-11-24 · lanjutan dari `2026-11-24-tahan-naik-design.md`
 
 ## Intent (kenapa)
 
@@ -127,6 +127,31 @@ Pemain memilih A (2026-11-24).
 - Screenshot: buih terlihat di tepi kanan layar saat burung di puncak sebelumnya.
 - Semua tes lama tetap lulus, dan menu/toko jalan tanpa error.
 - Yang tidak bisa dibuktikan mesin: **apakah buih "kelihatan" dan lompatan "puas"**. Itu dites pemain.
+
+## Tahap 2 — Tanpa timer + layar kalah 3 tombol (detail)
+
+### Keputusan saya (bisa dikoreksi)
+- **Dihapus:** `time_left`, bar waktu dan angka detik di HUD, status `night`/senja (burung mengantuk, `Bird.sleepy`),
+  bonus waktu pulau (banner pulau tidak lagi menulis "+N detik"), bola matahari "+3 detik" (`CoinField.SUN`),
+  flag dev `--time=`. Bonus pulau lain tetap: +500 poin, +20 koin.
+- **Langit:** `sun_progress` tetap (0,8) dan `dusk` 0. Suasana langit tetap berganti per pulau lewat warna biome.
+- **Layar kalah:** judul penyebab + satu baris saran ("Sentuh bibir oranye untuk melompat" dsb.) supaya pemain
+  paham apa yang harus dicoba berbeda, skor, statistik, lalu **tepat tiga tombol**: **Main Lagi**, **Menu**,
+  **Lanjut (tonton iklan)**. Tombol "Koin ×2 (iklan)" dihapus karena spec meminta tepat tiga tombol
+  (asumsi baru: sedikit mengubah ekonomi koin, dicatat di PR).
+- **Lanjut hanya sekali per run** (seperti sebelumnya). Setelah dipakai, tombolnya tetap tampil tapi nonaktif
+  ("Lanjut sudah dipakai"), jadi layar selalu punya tiga tombol.
+- **Tempat aman:** semua kematian terjadi di atas air (laut, teluk, ombak, monster). Saat lanjut, burung dipindah
+  **maju** ke tanah kering pertama setelah air itu (+120 px), 200 px di atas tanah, kecepatan ≥ 500, stamina penuh,
+  monster/ombak dibersihkan. Skor tidak pernah turun (jarak hanya bertambah sedikit). Popup "Terbang lagi!".
+- **Sim keseimbangan:** karena lari tidak berakhir sendiri, mode `--sim` berhenti setelah `--sim-max=S` detik
+  (bawaan 240) dengan `cause=batas`.
+
+### Bukti selesai (tahap 2)
+- Tes: tidak ada lagi `time_left`/`night`; berjalan 60 dtk tanpa rintangan tidak mengakhiri run.
+- Tes: layar kalah punya tepat tiga tombol bernama Main Lagi, Menu, Lanjut; setelah lanjut sekali, tombol Lanjut nonaktif.
+- Tes: lanjut setelah mati di laut dan di teluk menempatkan burung di atas tanah kering dan skor tidak turun.
+- Sim `--sim` selesai dengan `RUN score=…`.
 
 ## Constraints
 

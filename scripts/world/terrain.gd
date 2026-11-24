@@ -131,6 +131,18 @@ func soft_landing_at(x: float) -> bool:
 	return false
 
 
+## First safe x at or after x: past any water, on ground that is not a steep climb
+## (so a respawned bird does not bonk). Used by "Lanjut" after a death over water.
+func dry_ground_after(x: float) -> float:
+	var limit := x + 6000.0
+	while x < limit and is_water_at(x):
+		x += 10.0
+	x += 120.0
+	while x < limit and (is_water_at(x) or slope_at(x) < -0.3 or kick_at(x)):
+		x += 10.0
+	return x
+
+
 ## Picks BAYS_PER_ISLAND hill indices in [2, hills-1], sorted, never two in a row.
 static func pick_bay_hills(hills: int, rng: RandomNumberGenerator) -> Array[int]:
 	var picked: Array[int] = []
@@ -275,7 +287,6 @@ func _add_bay(valley_x: float, k: int, biome: Dictionary) -> void:
 
 func _place_items(k: int, first_key: int, last_key: int, rng: RandomNumberGenerator, biome: Dictionary) -> void:
 	var prop_kind: String = biome.prop
-	var orbs_left := 2
 	var i := first_key
 	while i < last_key:
 		var x0 := keys_x[i]
@@ -295,9 +306,6 @@ func _place_items(k: int, first_key: int, last_key: int, rng: RandomNumberGenera
 			for j in 7:
 				var u := (j - 3) / 3.0
 				coins.add_item(Vector2(cx + u * 240.0, top + u * u * 120.0), CoinField.COIN)
-			if orbs_left > 0 and rng.randf() < 0.35:
-				coins.add_item(Vector2(cx, top - 130.0), CoinField.SUN)
-				orbs_left -= 1
 		# props on the ground
 		var n := 2 if prop_kind == "rice" else 1
 		for j in n:

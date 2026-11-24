@@ -125,15 +125,3 @@ class CoinIcon:
 	func _draw() -> void:
 		Art.coin(self, size * 0.5, size.x * 0.42, Time.get_ticks_msec() / 1000.0 * 0.3)
 
-
-class SunIcon:
-	extends Control
-	func _init(sz: float = 30.0) -> void:
-		custom_minimum_size = Vector2(sz, sz)
-		mouse_filter = Control.MOUSE_FILTER_IGNORE
-	func _draw() -> void:
-		var c := size * 0.5
-		for i in 8:
-			var a := TAU * i / 8.0
-			draw_line(c + Vector2(cos(a), sin(a)) * size.x * 0.3, c + Vector2(cos(a), sin(a)) * size.x * 0.48, Color("#ffd24a"), 3.0, true)
-		draw_circle(c, size.x * 0.24, Color("#ffd24a"))
