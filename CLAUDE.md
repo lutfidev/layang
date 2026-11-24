@@ -16,6 +16,9 @@ Godot 4.7.2, GDScript, GL Compatibility renderer, landscape 1280x720 (stretch ca
 - Fredoka font is a latin subset: avoid symbols like ▶ ★ ← (they render as boxes).
 
 ## Testing
+- Unit tests: `godot --headless --path . res://tests/run_tests.tscn` (add `-- --only=name` to filter) prints `TESTS passed=N failed=M`. New `class_name` scripts need `godot --headless --path . --import` once first.
+- Pass `--nosave` to sims/screenshots so they never overwrite the player's save (`--fresh` only skips loading).
+- Sea monster screenshot scene: `res://tests/monster_shot.tscn -- --shot=out.png --shot-delay=1.6`
 - Headless error check: `godot --headless --path . --quit-after 600 res://scenes/game.tscn -- --autoplay`
-- Balance sim: `godot --headless --path . --fixed-fps 120 res://scenes/game.tscn -- --autoplay --sim --fresh` prints `RUN score=…`
+- Balance sim: `godot --headless --path . --fixed-fps 120 res://scenes/game.tscn -- --autoplay --sim --fresh --nosave` prints `RUN score=…`
 - Screenshot: `... res://scenes/game.tscn -- --island=4 --autoplay --shot=out.png --shot-delay=8`
