@@ -325,3 +325,66 @@ func test_mission_continue_no_double_count() -> String:
 	var p := _progress("coins_150")
 	Game.apply_save(keep)
 	return "" if p == 15 else "coins progress %d, want 15" % p
+
+
+# ---------------------------------------------------------------- panels (Task 3)
+
+func _count_label(n: Node, text: String) -> int:
+	var c := 1 if (n is Label and (n as Label).text == text) else 0
+	for ch in n.get_children():
+		c += _count_label(ch, text)
+	return c
+
+
+func _shows_active(n: Node) -> String:
+	if _count_label(n, "Misi") < 1:
+		return "no Misi title"
+	for a in Game.missions:
+		if _count_label(n, Missions.label(Missions.get_mission(a.id))) != 1:
+			return "missing row %s" % a.id
+	return ""
+
+
+func test_mission_menu_shows_missions() -> String:
+	var keep := _fresh()
+	var m: Node = load("res://scenes/main_menu.tscn").instantiate()
+	runner.add_child(m)
+	var r := _shows_active(m)
+	Game.apply_save(keep)
+	return r
+
+
+func test_mission_pause_shows_missions() -> String:
+	var keep := _fresh()
+	var g := _game()
+	g._toggle_pause()
+	var r := _shows_active(g.pause_panel)
+	runner.get_tree().paused = false
+	Game.apply_save(keep)
+	return r
+
+
+func test_mission_results_show_done() -> String:
+	var keep := Game.save_data()
+	var g := _game()
+	_force(["skim_10", "coins_150", "pass_5"])
+	Game.missions[0].progress = 10
+	g._finish("laut")
+	var r := ""
+	if _count_label(g.result_panel, "Selesai! +50") != 1:
+		r = "no Selesai! +50 row"
+	elif _count_label(g.result_panel, Missions.label(Missions.get_mission("coins_150"))) != 1:
+		r = "unfinished mission of the run not shown"
+	Game.apply_save(keep)
+	return r
+
+
+func test_mission_level_done_shows_missions() -> String:
+	var keep := Game.save_data()
+	Game.level_stars = {}
+	var g := _game("sawah-1")
+	_force(["skim_10", "coins_150", "level_clean_1"])
+	g._finish_level()
+	var r := "" if _count_label(g.result_panel, "Selesai! +75") == 1 else "no Selesai! +75 on the level done screen"
+	Game.apply_save(keep)
+	return r

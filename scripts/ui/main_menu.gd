@@ -15,7 +15,7 @@ func _ready() -> void:
 	world.hazards = false
 	world.start_island = Game.dev_int("island", randi() % Biomes.count())
 	world.sun_progress = 0.8
-	world.bird_screen_x = 0.66
+	world.bird_screen_x = 0.56
 	add_child(world)
 	world.island_reached.connect(func(_k, b): lbl_now.text = "Sedang melintas: %s" % b.name)
 	_build_ui()
@@ -99,6 +99,15 @@ func _build_ui() -> void:
 	tr.add_child(mus)
 	coin_pill = _coin_pill(str(Game.coins))
 	tr.add_child(coin_pill)
+
+	# right: the three active missions
+	var mp := UIKit.missions_panel(UIKit.active_mission_entries(), 420.0)
+	root.add_child(mp)
+	mp.anchor_left = 1.0
+	mp.anchor_right = 1.0
+	mp.offset_left = -448.0
+	mp.offset_right = -28.0
+	mp.offset_top = 150.0
 
 	lbl_now = UIKit.label("Sedang melintas: %s" % world.current_biome().name, 22, Color(1, 1, 1, 0.9), false, 6)
 	lbl_now.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT

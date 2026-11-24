@@ -43,6 +43,7 @@ var _high_awarded := false
 var fever_t := 0.0
 var continued := false
 var missions_done: Array = []   # missions paid at the end of this run: [{id, reward}]
+var missions_run: Array = []    # the active missions as they were when the run ended (shown on the results)
 var coin_chain := 0
 var coin_chain_t := 0.0
 var start_x := 0.0
@@ -173,7 +174,7 @@ func _finish(cause: String) -> void:
 	var earned := coins_run - coins_banked
 	coins_banked = coins_run
 	Game.add_coins(earned)
-	missions_done = Game.settle_missions()
+	_settle_missions()
 	var record := false
 	if level.is_empty():
 		record = Game.submit_run(score(), distance, world.current_island + 1)
@@ -206,7 +207,7 @@ func _finish_level() -> void:
 	Game.mission_event("stars", new_stars)
 	if not continued:
 		Game.mission_event("level_clean")
-	missions_done = Game.settle_missions()
+	_settle_missions()
 	lbl_hint.hide()
 	if Game.dev.has("autoplay"):
 		print("RUN level=%s stars=%d coins=%d/%d run_coins=%d dist=%d cause=selesai" % [level.id, stars, level_coins, level_coins_total, coins_run, distance])
@@ -536,7 +537,13 @@ func _toggle_pause() -> void:
 	get_tree().paused = true
 	pause_panel = _overlay()
 	var p := UIKit.panel()
-	_center(pause_panel, p)
+	var side := HBoxContainer.new()
+	side.add_theme_constant_override("separation", 20)
+	side.add_child(p)
+	var mp := UIKit.missions_panel(UIKit.active_mission_entries(), 400.0)
+	mp.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	side.add_child(mp)
+	_center(pause_panel, side)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 16)
 	p.add_child(v)
@@ -567,8 +574,37 @@ func _toggle_pause() -> void:
 
 ## Leaving mid-run from the pause panel still pays finished missions.
 func _leave_run(path: String) -> void:
-	missions_done = Game.settle_missions()
+	_settle_missions()
 	Game.goto(path)
+
+
+func _settle_missions() -> void:
+	missions_run = Game.missions.duplicate(true)
+	missions_done = Game.settle_missions()
+
+
+## The run's missions for the results panel, with the reward of the ones just paid.
+func _run_mission_entries() -> Array:
+	var out: Array = []
+	for a in missions_run:
+		var paid := 0
+		for d in missions_done:
+			if d.id == a.id:
+				paid = int(d.reward)
+		out.append([Missions.get_mission(a.id), int(a.progress), paid])
+	return out
+
+
+## Puts the results panel and the run's missions side by side in the centre of the overlay.
+func _center_with_missions(parent: Control, p: Control) -> void:
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 20)
+	hb.alignment = BoxContainer.ALIGNMENT_CENTER
+	hb.add_child(p)
+	var mp := UIKit.missions_panel(_run_mission_entries(), 400.0)
+	mp.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	hb.add_child(mp)
+	_center(parent, hb)
 
 
 static func _onoff(name: String, on: bool) -> String:
@@ -599,7 +635,7 @@ func _show_results(record: bool) -> void:
 	create_tween().tween_property(result_panel, "modulate:a", 1.0, 0.4)
 	var p := UIKit.panel(Color(0.12, 0.08, 0.24, 0.9), 34)
 	p.custom_minimum_size = Vector2(620, 0)
-	_center(result_panel, p)
+	_center_with_missions(result_panel, p)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	p.add_child(v)
@@ -683,7 +719,7 @@ func _show_level_done(stars: int, new_stars: int, earned: int, bonus: int) -> vo
 	fade.tween_property(result_panel, "modulate:a", 1.0, 0.4)
 	var p := UIKit.panel(Color(0.12, 0.08, 0.24, 0.9), 34)
 	p.custom_minimum_size = Vector2(620, 0)
-	_center(result_panel, p)
+	_center_with_missions(result_panel, p)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	p.add_child(v)
