@@ -251,3 +251,79 @@ static func shadow(ci: CanvasItem, c: Vector2, rx: float, ry: float, alpha: floa
 	for i in 3:
 		var k := 1.0 - i * 0.28
 		ellipse(ci, c, rx * k, ry * k, Color(0.05, 0.02, 0.12, alpha * 0.4), rot)
+
+
+## Launch lip marking: a bright band along the ground surface plus three pulsing chevrons
+## pointing up the ramp, so players read it as "touch here to be flung up".
+static func launch_ramp(ci: CanvasItem, surface: PackedVector2Array, col: Color, edge: Color, t: float) -> void:
+	if surface.size() < 2:
+		return
+	var band := PackedVector2Array(surface)
+	for i in range(surface.size() - 1, -1, -1):
+		band.append(surface[i] + Vector2(0, 26))
+	ci.draw_colored_polygon(band, col)
+	ci.draw_polyline(surface, edge, 4.0, true)
+	var n := surface.size()
+	for k in 3:
+		var u := fmod(t * 0.9 + k / 3.0, 1.0)
+		var i := clampi(int(u * (n - 1)), 0, n - 2)
+		var dir := (surface[i + 1] - surface[i]).normalized().rotated(-0.15)
+		var nrm := dir.orthogonal()
+		var a := sin(u * PI)
+		var tip := surface[i] + Vector2(0, -46) + dir * 30.0
+		var back := tip - dir * 50.0
+		# filled arrow head pointing up the ramp
+		var c := Color(1, 1, 1, 0.95 * a)
+		ci.draw_colored_polygon(PackedVector2Array([tip, back - nrm * 13.0, back + nrm * 13.0]), c)
+
+
+## Bubbling foam on a bay's surface: the warning before a wave. `density` 0..1 grows as it nears.
+static func foam(ci: CanvasItem, x0: float, x1: float, y: float, density: float, t: float) -> void:
+	var n := int(6 + 18 * density)
+	for i in n:
+		var ph := fmod(t * (1.2 + 0.4 * sin(i * 1.7)) + i * 0.41, 1.0)
+		var u := fmod(i * 0.618, 1.0)
+		var bx := lerpf(x0 + 10.0, x1 - 10.0, u) + sin(t * 3.0 + i) * 6.0
+		var by := y + 2.0 - ph * (14.0 + 26.0 * density)
+		var r := (4.0 + 7.0 * density) * (1.0 - ph * 0.6)
+		ci.draw_circle(Vector2(bx, by), r, Color(1, 1, 1, (0.55 + 0.4 * density) * (1.0 - ph)))
+	ci.draw_line(Vector2(x0, y + 1.0), Vector2(x1, y + 1.0), Color(1, 1, 1, 0.5 + 0.4 * density), 5.0)
+
+
+## A standing beach wave: a rounded teal wall around `mid` whose foamy crest curls to the left
+## (towards the oncoming bird), plus a soft shadow at its foot.
+static func wave(ci: CanvasItem, mid: float, half_w: float, water_y: float, h: float, water: Color, foam_col: Color, t: float) -> void:
+	shadow(ci, Vector2(mid, water_y + 6.0), half_w * 1.6, 12.0, 0.35)
+	var top := water_y - h
+	var wob := sin(t * 3.0) * 4.0
+	# body: long gentle back slope on the right, steep curling face on the left
+	var pts := PackedVector2Array()
+	for i in 17:
+		var u := float(i) / 16.0                       # 0 = right foot, 1 = crest
+		var x := lerpf(mid + half_w * 2.2, mid + half_w * 0.1, u)
+		var y := lerpf(water_y + 4.0, top, 1.0 - pow(1.0 - u, 2.2)) + sin(t * 4.0 + u * 7.0) * 2.0
+		pts.append(Vector2(x, y))
+	# the curl: crest -> overhanging tip -> back under -> left foot (simple, non-crossing outline)
+	pts.append(Vector2(mid - half_w * 0.9, top + h * 0.25 + wob))
+	pts.append(Vector2(mid - half_w * 0.55, top + h * 0.42))
+	pts.append(Vector2(mid - half_w * 0.85, water_y + 4.0))
+	ci.draw_colored_polygon(pts, water)
+	# darker hollow under the curl
+	ci.draw_colored_polygon(PackedVector2Array([
+		Vector2(mid - half_w * 0.55, top + h * 0.42), Vector2(mid + half_w * 0.1, top + h * 0.3),
+		Vector2(mid + half_w * 0.5, water_y + 4.0), Vector2(mid - half_w * 0.85, water_y + 4.0)]), water.darkened(0.22))
+	var cc := Vector2(mid - half_w * 0.35, top + h * 0.12 + wob * 0.5)
+	var cr := h * 0.13
+	# lighter stripe on the back
+	for i in 3:
+		var y := lerpf(top + h * 0.3, water_y - 10.0, float(i) / 3.0)
+		ci.draw_line(Vector2(mid + half_w * (0.4 + i * 0.4), y), Vector2(mid + half_w * (0.9 + i * 0.45), y + 8.0), water.lightened(0.25), 4.0, true)
+	# foam along the crest and curl
+	for i in 11:
+		var ang := -PI * 0.1 - float(i) / 10.0 * PI
+		var p := cc + Vector2(cos(ang), sin(ang)) * Vector2(half_w * 0.6, cr)
+		ci.draw_circle(p, 12.0 - i * 0.5 + sin(t * 6.0 + i) * 1.5, foam_col)
+	ci.draw_circle(Vector2(mid - half_w * 0.9, top + h * 0.25 + wob), 8.0, foam_col)
+	for i in 6:
+		var u := fmod(t * 0.8 + i / 6.0, 1.0)
+		ci.draw_circle(Vector2(mid - half_w * 0.9 + u * half_w * 0.2, water_y - u * 30.0), 5.0 * (1.0 - u), Color(1, 1, 1, 0.8 * (1.0 - u)))

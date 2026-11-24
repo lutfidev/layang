@@ -90,3 +90,46 @@ func test_night_over_sea_ends_run() -> String:
 	if g.state != "over":
 		return "still %s after grace" % g.state
 	return "" if g.end_cause in ["laut", "senja"] else "cause=%s" % g.end_cause
+
+
+func test_wave_death_title() -> String:
+	var g := _game()
+	g.world.bird_died.emit("ombak")
+	if g.state != "over" or g.end_cause != "ombak":
+		return "state=%s cause=%s" % [g.state, g.end_cause]
+	return "" if _has_text(g.result_panel, "Terkena ombak") else "results title missing"
+
+
+func test_wave_passed_rewards() -> String:
+	var g := _game()
+	g.world.wave_passed.emit()
+	if g.style_points != g.WAVE_POINTS:
+		return "style_points=%d" % g.style_points
+	return "" if g.lbl_popup.text == "LOLOS OMBAK!" else "popup=%s" % g.lbl_popup.text
+
+
+func test_pantai_warns_about_waves() -> String:
+	var g := _game()
+	g._on_island(1, Biomes.get_biome(1))
+	return "" if g.lbl_popup.text == "Awas ombak!" else "popup=%s" % g.lbl_popup.text
+
+
+func test_continue_after_bay_death_is_safe() -> String:
+	Game.dev["island"] = 1
+	var g := _game()
+	Game.dev.erase("island")
+	var w: World = g.world
+	var deaths: Array = []
+	w.bird_died.connect(func(c: String): deaths.append(c))
+	var bay: Dictionary = w.terrain.bays[0]
+	w.bird.position = Vector2(bay.lip_x, Terrain.LIP_Y - 40.0)
+	w.bird.vel = Vector2(Bird.SPEED_START, 0.0)
+	w.bird.on_ground = false
+	_frames(g, 3.0)
+	if deaths != ["ombak"] or g.state != "over":
+		return "did not hit the wave first: %s state=%s" % [deaths, g.state]
+	g._continue_run()
+	if w.bird.position.y > Terrain.WATER_Y - 500.0:
+		return "respawn too low y=%f" % w.bird.position.y
+	_frames(g, 2.0)
+	return "" if deaths.size() == 1 else "died again right after continue: %s" % [deaths]

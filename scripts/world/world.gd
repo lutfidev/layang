@@ -7,7 +7,8 @@ signal island_reached(k: int, biome: Dictionary)
 signal item_collected(kind: int, pos: Vector2)
 signal bird_landed(bonk: bool)
 signal bird_splashed
-signal bird_died(cause: String)        # "laut" | "monster"
+signal bird_died(cause: String)        # "laut" | "monster" | "ombak"
+signal wave_passed
 signal bird_skimmed(duration: float)
 
 var autoplay := false
@@ -29,6 +30,7 @@ var input_enabled := true
 var hazards := true        # false in menu / shop demo worlds: the sea just bounces the bird
 var dead := false
 var monster: SeaMonster
+var wave: Wave
 
 var _sky_mat: ShaderMaterial
 var _sky_rect: ColorRect
@@ -81,6 +83,13 @@ func _ready() -> void:
 	add_child(bird)
 	monster = SeaMonster.new()
 	add_child(monster)
+	wave = Wave.new()
+	wave.terrain = terrain
+	wave.sounds = hazards
+	add_child(wave)
+	wave.passed.connect(func():
+		if not dead:
+			wave_passed.emit())
 	var shade := BirdShadow.new()
 	shade.world = self
 	add_child(shade)
@@ -98,6 +107,9 @@ func _ready() -> void:
 	bird.landed.connect(_on_landed)
 	bird.splashed.connect(_on_splash)
 	bird.skimmed.connect(func(d: float): bird_skimmed.emit(d))
+	bird.kicked.connect(func():
+		if hazards:
+			Sfx.play("whoosh", 1.3))
 
 	_biome_to = Biomes.get_biome(start_island)
 	_biome_from = _biome_to
@@ -150,9 +162,11 @@ func _physics_process(delta: float) -> void:
 
 func _update_hazards(delta: float) -> void:
 	var x := bird.position.x
+	var hit_wave := wave.update(delta, bird.center(), x)
+	var over_water := terrain.is_water_at(x)
 	var over_sea := terrain.is_sea_at(x)
 	if not hazards:
-		if over_sea and bird.position.y > Terrain.WATER_Y - 30.0:
+		if over_water and bird.position.y > Terrain.WATER_Y - 30.0:
 			bird.vel.y = -Bird.MAX_RISE
 			bird.on_ground = false
 		return
@@ -175,7 +189,9 @@ func _update_hazards(delta: float) -> void:
 			_jump_cd = warn + SeaMonster.JUMP_TIME + 0.5
 	if monster.update(delta, bird.center()):
 		_die("monster")
-	elif over_sea and bird.center().y > Terrain.WATER_Y:
+	elif hit_wave:
+		_die("ombak")
+	elif over_water and bird.center().y > Terrain.WATER_Y:
 		_die("laut")
 
 
@@ -185,12 +201,17 @@ func _die(cause: String) -> void:
 		shake = 1.2
 		Sfx.play("chomp")
 		Ambient.burst(self, bird.center(), Color("#ffffff"), 22, 520.0)
+	elif cause == "ombak":
+		shake = 1.0
+		Sfx.play("splash")
+		Ambient.burst(self, bird.center(), (_biome_to.water_top as Color), 30, 600.0)
 	bird_died.emit(cause)
 
 
 ## Removes any active sea monster and its remaining jumps for this sea (used by "Lanjut terbang").
 func clear_hazards() -> void:
 	monster.reset()
+	wave.reset_current()
 	_jumps_left = 0
 	_jump_cd = 0.0
 
@@ -317,7 +338,7 @@ class BirdShadow:
 	func _draw() -> void:
 		var b := world.bird
 		var x := b.position.x
-		var sea := world.terrain.is_sea_at(x)
+		var sea := world.terrain.is_water_at(x)
 		var gy := Terrain.WATER_Y + 2.0 if sea else world.terrain.height_at(x)
 		var h := gy - b.position.y
 		if h > 900.0 or h < -4.0:

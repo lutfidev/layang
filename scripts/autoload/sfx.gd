@@ -29,6 +29,8 @@ func _ready() -> void:
 	_sounds["night"] = _tones([[392.0, 0.0, 0.8], [329.6, 0.25, 0.8], [261.6, 0.5, 1.2]], 0.32, 2.0)
 	_sounds["splash"] = _noise(0.35, 0.4)
 	_sounds["whoosh"] = _noise(0.25, 0.18)
+	_sounds["fizz"] = _noise(0.5, 0.12)
+	_sounds["surge"] = _noise(0.7, 0.35)
 	_sounds["blub"] = _tones([[220.0, 0.0, 0.12], [300.0, 0.14, 0.12], [250.0, 0.3, 0.14], [320.0, 0.46, 0.16]], 0.45, 14.0)
 	_sounds["chomp"] = _tones([[110.0, 0.0, 0.25], [82.0, 0.08, 0.3], [1900.0, 0.0, 0.05], [2400.0, 0.03, 0.04]], 0.55, 9.0)
 	var music: AudioStreamOggVorbis = load("res://assets/audio/gamelan_loop.ogg")

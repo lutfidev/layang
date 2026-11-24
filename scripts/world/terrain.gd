@@ -7,6 +7,18 @@ const DEPTH := 1700.0
 const SEA_FLOOR := 470.0
 const WATER_Y := 300.0
 const SAMPLE := 14.0
+# Pantai bays: water-filled valleys with a launch lip before them (see Bird.LIP_KICK)
+const BAYS_PER_ISLAND := 3
+const BAY_VALLEY_Y := 60.0
+const LIP_Y := -60.0
+const LIP_RAMP := 480.0
+const BAY_FLOOR_Y := 380.0
+const BAY_HALF := 300.0
+const BANK_Y := 40.0
+const KICK_BEFORE := 40.0
+const KICK_AFTER := 10.0
+const LIP_COLOR := Color("#ff7a59")
+const LIP_EDGE := Color("#ffe066")
 
 var run_seed: int = 1
 var start_island: int = 0
@@ -18,6 +30,8 @@ var keys_island := PackedInt32Array()
 var boundaries := PackedFloat32Array()
 var island_finish := PackedFloat32Array()   # x of each island's gapura peak
 var props: Array = []                         # [{x, kind, island, s}]
+## Pantai bays, sorted by x: {lip_x, mid, water_x0, water_x1, bank_x, island}
+var bays: Array = []
 
 var coins: CoinField
 var _islands_generated := 0
@@ -74,8 +88,65 @@ func height_at(x: float) -> float:
 	return keys_y[i] + (keys_y[i + 1] - keys_y[i]) * (1.0 - cos(PI * t)) * 0.5
 
 
-func is_sea_at(x: float) -> bool:
+## Any water: the sea between islands or a Pantai bay.
+func is_water_at(x: float) -> bool:
 	return height_at(x) > WATER_Y
+
+
+## The sea between islands (not a bay).
+func is_sea_at(x: float) -> bool:
+	return is_water_at(x) and bay_at(x) < 0
+
+
+## Index of the bay whose water covers x, or -1.
+func bay_at(x: float) -> int:
+	for i in bays.size():
+		var b: Dictionary = bays[i]
+		if x >= b.water_x0 and x <= b.water_x1:
+			return i
+	return -1
+
+
+## The first bay the bird at x has not fully passed yet, or -1.
+func next_bay(x: float) -> int:
+	for i in bays.size():
+		if bays[i].water_x1 + Wave.WAVE_HALF > x:
+			return i
+	return -1
+
+
+## True on the launch zone at the top of a bay's lip.
+func kick_at(x: float) -> bool:
+	for b in bays:
+		if x >= b.lip_x - KICK_BEFORE and x <= b.lip_x + KICK_AFTER:
+			return true
+	return false
+
+
+## True on the far bank of a bay, where a landing never counts as a bonk.
+func soft_landing_at(x: float) -> bool:
+	for b in bays:
+		if x >= b.water_x1 and x <= b.bank_x:
+			return true
+	return false
+
+
+## Picks BAYS_PER_ISLAND hill indices in [2, hills-1], sorted, never two in a row.
+static func pick_bay_hills(hills: int, rng: RandomNumberGenerator) -> Array[int]:
+	var picked: Array[int] = []
+	while picked.size() != BAYS_PER_ISLAND:
+		picked.clear()
+		var pool: Array[int] = []
+		for h in range(2, hills):
+			pool.append(h)
+		while picked.size() < BAYS_PER_ISLAND and not pool.is_empty():
+			var h: int = pool[rng.randi_range(0, pool.size() - 1)]
+			picked.append(h)
+			pool.erase(h)
+			pool.erase(h - 1)
+			pool.erase(h + 1)
+	picked.sort()
+	return picked
 
 
 func slope_at(x: float) -> float:
@@ -143,10 +214,19 @@ func _generate_island() -> void:
 		var lx := keys_x[keys_x.size() - 1]
 		_add_key(Vector2(lx + 1100.0, -110.0 * amp), k)
 
+	var bay_hills: Array[int] = []
+	if biome.id == "pantai":
+		var bay_rng := RandomNumberGenerator.new()
+		bay_rng.seed = run_seed * 6151 + k * 92821
+		bay_hills = pick_bay_hills(hills, bay_rng)
+
 	var hill_start_key := keys_x.size() - 1
 	for h in hills:
 		var lx := keys_x[keys_x.size() - 1]
 		var vx := lx + rng.randf_range(440.0, 720.0) * wid
+		if h in bay_hills:
+			_add_bay(vx, k, biome)
+			continue
 		var vy := rng.randf_range(60.0, 150.0) * amp
 		_add_key(Vector2(vx, vy), k)
 		var px := vx + rng.randf_range(420.0, 700.0) * wid
@@ -175,6 +255,24 @@ func _generate_island() -> void:
 	_islands_generated += 1
 
 
+func _add_bay(valley_x: float, k: int, biome: Dictionary) -> void:
+	var lip_x := valley_x + LIP_RAMP
+	var floor_x := lip_x + BAY_HALF
+	var bank_x := floor_x + BAY_HALF
+	_add_key(Vector2(valley_x, BAY_VALLEY_Y), k)
+	_add_key(Vector2(lip_x, LIP_Y), k)
+	_add_key(Vector2(floor_x, BAY_FLOOR_Y), k)
+	_add_key(Vector2(bank_x, BANK_Y), k)
+	var x0 := lip_x
+	while height_at(x0) <= WATER_Y:
+		x0 += 2.0
+	var x1 := floor_x
+	while height_at(x1) > WATER_Y:
+		x1 += 2.0
+	bays.append({"lip_x": lip_x, "mid": floor_x, "water_x0": x0, "water_x1": x1 - 2.0, "bank_x": bank_x, "island": k})
+	_build_water(lip_x, bank_x, biome)
+
+
 func _place_items(k: int, first_key: int, last_key: int, rng: RandomNumberGenerator, biome: Dictionary) -> void:
 	var prop_kind: String = biome.prop
 	var orbs_left := 2
@@ -188,6 +286,8 @@ func _place_items(k: int, first_key: int, last_key: int, rng: RandomNumberGenera
 			for j in 6:
 				var t := 0.22 + j * 0.1
 				var x := lerpf(x0, x1, t)
+				if is_water_at(x):
+					continue
 				coins.add_item(Vector2(x, height_at(x) - 38.0), CoinField.COIN)
 		elif (not downhill) and roll < 0.3:
 			var cx := x1 + 260.0
@@ -203,6 +303,8 @@ func _place_items(k: int, first_key: int, last_key: int, rng: RandomNumberGenera
 		for j in n:
 			if rng.randf() < 0.55:
 				var px := lerpf(x0, x1, rng.randf_range(0.1, 0.9))
+				if is_water_at(px):
+					continue
 				props.append({"x": px, "kind": prop_kind, "island": k, "s": rng.randf_range(0.8, 1.3)})
 		i += 1
 
@@ -298,6 +400,16 @@ class PropsLayer:
 		if terrain == null:
 			return
 		var t := Time.get_ticks_msec() / 1000.0
+		for bay in terrain.bays:
+			var lx: float = bay.lip_x
+			if lx < view_left - 400.0 or lx > view_right + 400.0:
+				continue
+			var surf := PackedVector2Array()
+			var sx := lx - 220.0
+			while sx <= lx + KICK_AFTER:
+				surf.append(Vector2(sx, terrain.height_at(sx)))
+				sx += 14.0
+			Art.launch_ramp(self, surf, LIP_COLOR, LIP_EDGE, t)
 		for p in terrain.props:
 			var x: float = p.x
 			if x < view_left - 300.0 or x > view_right + 300.0:

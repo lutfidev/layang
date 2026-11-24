@@ -4,6 +4,7 @@ extends Node2D
 const START_TIME := 42.0
 const NIGHT_GRACE := 6.0
 const HIGH_FLIGHT := 520.0     # px above ground/water for "TERBANG TINGGI!"
+const WAVE_POINTS := 150        # style points for clearing a beach wave
 
 var world: World
 var state := "ready"       # ready → play → night → over
@@ -14,7 +15,7 @@ var coins_run := 0
 var coins_banked := 0
 var skim_streak := 0
 var best_skim := 0
-var end_cause := ""         # senja | laut | monster
+var end_cause := ""         # senja | laut | monster | ombak
 var _high_awarded := false
 var fever_t := 0.0
 var night_t := 0.0
@@ -47,6 +48,7 @@ func _ready() -> void:
 		time_left = float(Game.dev["time"])
 	world = World.new()
 	world.start_island = Game.dev_int("island", 0)
+	world.run_seed = Game.dev_int("seed", 1)   # 1 = random (see World._ready)
 	world.running = false
 	world.autoplay = Game.dev.has("autoplay")
 	add_child(world)
@@ -56,6 +58,7 @@ func _ready() -> void:
 	world.bird_landed.connect(_on_landed)
 	world.bird_skimmed.connect(_on_skimmed)
 	world.bird_died.connect(_on_died)
+	world.wave_passed.connect(_on_wave_passed)
 	world.bird_splashed.connect(func(): Sfx.play("splash"))
 	_build_hud()
 	if world.autoplay:
@@ -84,6 +87,8 @@ func _start() -> void:
 	if not Game.tutorial_done:
 		lbl_hint.show()
 		hint_t = 14.0
+	if world.current_biome().id == "pantai":
+		_popup("Awas ombak!", "Sentuh bibir oranye untuk melompat", Color("#7ff0e6"))
 
 
 func _physics_process(delta: float) -> void:
@@ -173,7 +178,7 @@ func _continue_run() -> void:
 	b.exhausted = false
 	b.on_ground = false
 	# respawn safely: high above the water (time to react), or just above the ground
-	if world.terrain.is_sea_at(b.position.x):
+	if world.terrain.is_water_at(b.position.x):
 		b.position.y = Terrain.WATER_Y - 900.0
 	else:
 		b.position.y = world.terrain.height_at(b.position.x) - 200.0
@@ -200,6 +205,8 @@ func _on_island(k: int, biome: Dictionary) -> void:
 	Sfx.play("island")
 	Ambient.burst(world, world.bird.center(), Color("#ffe066"), 40, 700.0)
 	_show_banner(k, biome, bonus)
+	if biome.id == "pantai":
+		_popup("Awas ombak!", "Sentuh bibir oranye untuk melompat", Color("#7ff0e6"))
 
 
 func _on_item(kind: int, _pos: Vector2) -> void:
@@ -246,6 +253,14 @@ func _on_skimmed(_duration: float) -> void:
 		Game.tutorial_done = true
 		Game.save_game()
 		_hide_hint()
+
+
+func _on_wave_passed() -> void:
+	if state not in ["play", "night"]:
+		return
+	style_points += WAVE_POINTS
+	Sfx.play("perfect", 1.2)
+	_popup("LOLOS OMBAK!", "+%d" % WAVE_POINTS, Color("#7ff0e6"))
 
 
 func _on_died(cause: String) -> void:
@@ -524,7 +539,7 @@ func _show_results(record: bool) -> void:
 	v.add_theme_constant_override("separation", 10)
 	p.add_child(v)
 
-	var titles := {"senja": "Senja telah tiba", "laut": "Tercebur ke laut!", "monster": "Digigit monster laut!"}
+	var titles := {"senja": "Senja telah tiba", "laut": "Tercebur ke laut!", "monster": "Digigit monster laut!", "ombak": "Terkena ombak"}
 	var title := UIKit.label(titles.get(end_cause, "Senja telah tiba"), 44, Color("#ffd8a8"), true)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(title)

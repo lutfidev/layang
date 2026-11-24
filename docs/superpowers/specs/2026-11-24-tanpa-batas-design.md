@@ -1,6 +1,6 @@
 # Layang Tanpa Batas — design
 
-Status: draft, menunggu persetujuan · 2026-11-24 · lanjutan dari `2026-11-24-tahan-naik-design.md`
+Status: disetujui (tahap 1 selesai di `feat/ombak-pantai`) · 2026-11-24 · lanjutan dari `2026-11-24-tahan-naik-design.md`
 
 ## Intent (kenapa)
 
@@ -73,6 +73,10 @@ Pemain memilih A (2026-11-24).
 - Urutannya: **buih dulu (tanda), lalu ombak naik**. Buih terlihat sejak turunan sebelumnya.
 - Cara melewatinya: momentum dari turunan, lalu lepas di bibir bukit untuk melompat.
 - Kena ombak = kalah, judul hasil **"Terkena ombak"**.
+- **Bibir pelontar** (diputuskan saat menulis plan): fisika sekarang tidak memberi momentum dari tanjakan
+  (puncak bukit datar, gravitasi kuat), jadi bibir sebelum teluk adalah ramp. Burung yang menyentuh tanah di
+  zona `[lip_x-40, lip_x+10]` dilempar ke atas dengan `vel.y = -620`. Ramp diberi pita oranye dan panah putih
+  supaya terbaca. Mendarat di tepi seberang teluk tidak pernah dihitung bonk.
 - Ada opsi dev untuk langsung mulai di pulau Pantai (`--island=1` sudah ada, karena Pantai biome ke-2).
 - Dibuat serius, bukan buang-buangan. Timer tetap ada di tahap ini (dihapus di tahap 2). `--time=` bisa dipakai saat tes.
 
@@ -102,6 +106,14 @@ Pemain memilih A (2026-11-24).
   memantulkan burung seperti laut sekarang.
 - **Autopilot** (`--autoplay`, menu demo, sim) harus bisa melewati teluk dan ombak dengan reaksi manusiawi,
   supaya sim keseimbangan tetap berguna.
+
+### Angka akhir tahap 1
+- Teluk: lembah y=60, bibir y=-60 (tanjakan 480 px), dasar y=380, tepi seberang y=40, jarak bibir→dasar→tepi
+  300 px; air ≈ 180 px lebar. 3 teluk per pulau Pantai, tidak di 2 bukit pertama, tidak berurutan.
+- Ombak: tinggi 200 px (puncak y=100), kolom ±70 px di tengah teluk; buih mulai 1900 px sebelum tengah teluk,
+  naik dari 750 px, penuh dari 200 px; surut 0,9 dtk. Lolos = +150 poin gaya, popup "LOLOS OMBAK!".
+- Margin terukur: burung terlempar paling lambat berada di y≈-106 di atas kolom ombak (puncak y=100).
+- Popup "Awas ombak!" saat pulau Pantai tercapai atau saat run dimulai di Pantai.
 
 ### Diserahkan ke pembuat
 - Angka pasti: lebar/kedalaman teluk, tinggi dan durasi ombak, radius kena, jarak picu.
