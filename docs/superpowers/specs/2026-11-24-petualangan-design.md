@@ -1,6 +1,6 @@
 # Petualangan (18 level) + Misi — design
 
-Status: disetujui pemilik repo (2026-11-24) · lanjutan dari `2026-11-24-rintangan-pulau-design.md`
+Status: disetujui pemilik repo (2026-11-24). Langkah Petualangan selesai (`feat/peta-petualangan`) · lanjutan dari `2026-11-24-rintangan-pulau-design.md`
 
 ## Intent (kenapa)
 
@@ -156,6 +156,20 @@ tumbuh) dicatat sebagai tujuan jangka panjang, dan peta pulau ini nanti bisa men
 - Teks pemain bahasa Indonesia. Font Fredoka subset latin (tanpa ★ ▶ ←).
 - Layar landscape 1280×720, tombol cukup besar untuk jari (tinggi ≥ 72 px).
 - Tes dan sim selalu `--nosave`.
+
+## Angka akhir (langkah Petualangan)
+
+- Nama level memakai id pulau ("Sawah Pagi", "Awan Badai"), bukan kata pertama nama pulau (yang menghasilkan "Negeri Pagi").
+- Seed level: `1000 + 7·i`. Kesembilan level siap selesai lewat sim autopilot (`cause=selesai`):
+  sawah 1100/1354/1531 m, pantai 1090/1388/1692 m, hutan 1119/1301/1575 m. Waktu ±30–45 dtk per level.
+- Koin level: sawah 35/54/63, pantai 27/66/82, hutan 53/55/56. Sekitar separuhnya ada di busur tinggi, jadi bintang
+  koin menuntut jalur atas yang berisiko. Autopilot tidak mengejar koin, sehingga angka koinnya bukan ukuran kesulitan.
+- Layar selesai menampilkan satu baris saran untuk bintang yang belum didapat.
+- Perbaikan bug lama: `CoinField.add_item` sekarang menyisipkan koin terurut menurut x. Sebelumnya busur koin dimasukkan
+  sebelum koin tanah segmen berikutnya, dan `check()` berhenti di koin pertama di depan burung, sehingga sebagian koin
+  tidak pernah bisa diambil (juga di Tanpa Batas).
+- Peta tidak memakai gambar gembok atau pita: level terkunci berwarna abu-abu dan nonaktif, dan pulau belum siap diberi
+  label "Segera hadir".
 
 ## Diserahkan ke pembuat
 
