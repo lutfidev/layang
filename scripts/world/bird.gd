@@ -5,6 +5,7 @@ extends Node2D
 signal landed(bonk: bool)
 signal took_off
 signal splashed
+signal skimmed(duration: float)    # flew low over land long enough ("NYEREMPET")
 
 const GRAVITY := 1300.0
 const LIFT := 2900.0
@@ -23,6 +24,8 @@ const STAMINA_RESUME := 0.2
 const BONK_SLOPE := -0.5
 const BONK_FALL_SPEED := 420.0
 const GROUND_STICK := 12.0
+const SKIM_HEIGHT := 90.0
+const SKIM_MIN_TIME := 0.6
 const RADIUS := 22.0
 
 var terrain: Terrain
@@ -30,6 +33,7 @@ var vel := Vector2(360, 0)
 var holding := false
 var stamina := 1.0
 var exhausted := false
+var skim_t := 0.0
 var on_ground := true
 var sleepy := false
 var fever := false
@@ -142,10 +146,18 @@ func step(delta: float) -> void:
 		position.y = h
 		vel.y = vel.x * slope
 		on_ground = true
+		skim_t = 0.0
 	else:
 		on_ground = false
 		air_time += delta
 		max_air_height = maxf(max_air_height, h - position.y)
+		var in_zone := (h - position.y) < SKIM_HEIGHT and h < Terrain.WATER_Y
+		if in_zone:
+			skim_t += delta
+		elif skim_t > 0.0:
+			if skim_t >= SKIM_MIN_TIME:
+				skimmed.emit(skim_t)
+			skim_t = 0.0
 
 	var under := position.y > Terrain.WATER_Y + 4.0 and h > Terrain.WATER_Y
 	if under and not _was_underwater:

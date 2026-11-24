@@ -7,6 +7,7 @@ signal island_reached(k: int, biome: Dictionary)
 signal item_collected(kind: int, pos: Vector2)
 signal bird_landed(bonk: bool)
 signal bird_splashed
+signal bird_skimmed(duration: float)
 
 var autoplay := false
 var running := true
@@ -82,6 +83,7 @@ func _ready() -> void:
 	coins.collected.connect(func(kind, pos): item_collected.emit(kind, pos))
 	bird.landed.connect(_on_landed)
 	bird.splashed.connect(_on_splash)
+	bird.skimmed.connect(func(d: float): bird_skimmed.emit(d))
 
 	_biome_to = Biomes.get_biome(start_island)
 	_biome_from = _biome_to

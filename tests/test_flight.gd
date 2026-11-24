@@ -158,3 +158,69 @@ func test_sleepy_cannot_lift() -> String:
 	if b.stamina > 0.5:
 		return "sleepy stamina regen %f" % b.stamina
 	return ""
+
+
+# ---------------------------------------------------------------- skim (NYEREMPET)
+
+## Holds the bird `above` px over the terrain for `seconds` (re-placing it every step).
+func _hover(b: Bird, above: float, seconds: float) -> void:
+	for i in int(seconds / DT):
+		b.position.y = b.terrain.height_at(b.position.x) - above
+		b.on_ground = false
+		b.vel.y = 0.0
+		b.step(DT)
+
+
+func _skim_bird() -> Array:
+	var b := _air(3, -700, 0)
+	var got: Array = []
+	b.skimmed.connect(func(d: float): got.append(d))
+	return [b, got]
+
+
+func test_skim_emits() -> String:
+	var r := _skim_bird()
+	var b: Bird = r[0]
+	_hover(b, 50.0, 1.0)
+	_hover(b, 200.0, 0.1)
+	if r[1].size() != 1:
+		return "expected 1 skim, got %d" % r[1].size()
+	if r[1][0] < Bird.SKIM_MIN_TIME:
+		return "duration %f" % r[1][0]
+	return ""
+
+
+func test_skim_too_short() -> String:
+	var r := _skim_bird()
+	_hover(r[0], 50.0, 0.3)
+	_hover(r[0], 200.0, 0.1)
+	return "" if r[1].is_empty() else "short skim counted"
+
+
+func test_skim_cancelled_by_ground() -> String:
+	var r := _skim_bird()
+	var b: Bird = r[0]
+	_hover(b, 50.0, 0.8)
+	b.holding = false
+	var guard := 0
+	while not b.on_ground and guard < 1000:
+		b.step(DT)
+		guard += 1
+	_steps(b, 0.1)
+	if not r[1].is_empty():
+		return "skim counted after touching ground"
+	return "" if b.skim_t == 0.0 else "skim_t=%f" % b.skim_t
+
+
+func test_no_skim_over_sea() -> String:
+	var r := _skim_bird()
+	var b: Bird = r[0]
+	var t: Terrain = b.terrain
+	b.position.x = t.boundaries[0] - 300.0
+	for i in int(1.0 / DT):
+		b.position.y = Terrain.WATER_Y - 50.0
+		b.on_ground = false
+		b.step(DT)
+	b.position.y = Terrain.WATER_Y - 400.0
+	b.step(DT)
+	return "" if r[1].is_empty() else "skim over sea"
