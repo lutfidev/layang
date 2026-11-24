@@ -5,7 +5,7 @@ extends Node2D
 
 signal island_reached(k: int, biome: Dictionary)
 signal item_collected(kind: int, pos: Vector2)
-signal bird_landed(quality: int)
+signal bird_landed(bonk: bool)
 signal bird_splashed
 
 var autoplay := false
@@ -119,7 +119,7 @@ func _physics_process(delta: float) -> void:
 	if autoplay:
 		bird.holding = _ai_hold()
 	else:
-		bird.holding = input_enabled and (_touch_hold or Input.is_action_pressed("dive"))
+		bird.holding = input_enabled and (_touch_hold or Input.is_action_pressed("fly"))
 	bird.step(delta)
 	coins.check(bird.center(), 48.0, 230.0 if bird.fever else 0.0, delta)
 	var k := terrain.island_at(bird.position.x)
@@ -208,12 +208,10 @@ func _update_sky() -> void:
 	backdrop.tint = Color.WHITE.lerp(Color(0.55, 0.45, 0.72), _dusk * 0.7)
 
 
-func _on_landed(q: int) -> void:
-	if q == 0:
+func _on_landed(bonk: bool) -> void:
+	if bonk:
 		shake = 0.8
-	elif q == 2:
-		Ambient.burst(self, bird.position, _biome_to.hill_top, 18, 420.0)
-	bird_landed.emit(q)
+	bird_landed.emit(bonk)
 
 
 func _on_splash() -> void:

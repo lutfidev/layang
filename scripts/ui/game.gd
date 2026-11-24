@@ -63,7 +63,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_toggle_pause()
 		return
 	if state == "ready":
-		var pressed: bool = (event is InputEventMouseButton and event.pressed) or event.is_action_pressed("dive")
+		var pressed: bool = (event is InputEventMouseButton and event.pressed) or event.is_action_pressed("fly")
 		if pressed:
 			_start()
 
@@ -190,37 +190,15 @@ func _on_item(kind: int, _pos: Vector2) -> void:
 		_popup("+3 detik", "Matahari kecil!", Color("#ffe066"))
 
 
-func _on_landed(q: int) -> void:
+func _on_landed(bonk: bool) -> void:
 	if state == "over":
 		return
-	var b := world.bird
-	var height := b.max_air_height
-	if q == 2:
-		perfect_streak += 1
-		best_streak = maxi(best_streak, perfect_streak)
-		style_points += 25 * perfect_streak
-		Sfx.play("perfect", 1.0 + 0.06 * mini(perfect_streak, 8))
-		if perfect_streak >= 3 and fever_t <= 0.0 and state == "play":
-			fever_t = 6.0
-			b.fever = true
-			fever_lbl.show()
-			_popup("FEVER!", "Koin ×2 • magnet aktif", Color("#ff9d3c"))
-		elif fever_t > 0.0:
-			fever_t = minf(fever_t + 1.5, 8.0)
-			_popup("MULUS ×%d" % perfect_streak, "", Color("#9dff8a"))
-		else:
-			_popup("MULUS!" if perfect_streak == 1 else "MULUS ×%d" % perfect_streak, "", Color("#9dff8a"))
-		if not Game.tutorial_done and perfect_streak >= 2:
-			Game.tutorial_done = true
-			Game.save_game()
-			_hide_hint()
-	elif q == 0:
-		perfect_streak = 0
+	var height := world.bird.max_air_height
+	perfect_streak = 0
+	if bonk:
 		Sfx.play("bonk")
-		_popup("Aduh!", "Mendarat di tanjakan", Color("#ff8a8a"))
-	else:
-		perfect_streak = 0
-	if height > 520.0 and q != 0:
+		_popup("Aduh!", "Nabrak tanjakan", Color("#ff8a8a"))
+	elif height > 520.0:
 		var pts := int(height / 5.0)
 		style_points += pts
 		_popup("TERBANG TINGGI!", "+%d" % pts, Color("#8fd8ff"))

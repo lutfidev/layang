@@ -1,20 +1,35 @@
 class_name Bird
 extends Node2D
-## The player. Hold = heavy (dive), release = light (glide / launch off slopes).
+## The player. Hold = rise (costs stamina), release = glide down. Runs along the ground.
 
-signal landed(quality: int)        # 2 perfect, 1 ok, 0 bonk
+signal landed(bonk: bool)
 signal took_off
 signal splashed
 
-const GRAVITY := 1500.0
-const DIVE_MULT := 2.7
-const MIN_SPEED_X := 170.0
-const MAX_SPEED := 2700.0
+const GRAVITY := 1300.0
+const LIFT := 2900.0
+const MAX_RISE := 620.0
+const MAX_FALL := 520.0
+const SPEED_START := 380.0
+const SPEED_MAX := 700.0
+const SPEED_RAMP_X := 60000.0
+const SPEED_ACCEL := 600.0
+const CEILING_SOFT := -1200.0
+const CEILING_HARD := -1500.0
+const STAMINA_DRAIN := 0.4
+const STAMINA_REGEN_AIR := 0.33
+const STAMINA_REGEN_GROUND := 0.8
+const STAMINA_RESUME := 0.2
+const BONK_SLOPE := -0.5
+const BONK_FALL_SPEED := 420.0
+const GROUND_STICK := 12.0
 const RADIUS := 22.0
 
 var terrain: Terrain
 var vel := Vector2(360, 0)
 var holding := false
+var stamina := 1.0
+var exhausted := false
 var on_ground := true
 var sleepy := false
 var fever := false
@@ -75,47 +90,62 @@ func speed() -> float:
 	return vel.length()
 
 
+func can_lift() -> bool:
+	return holding and not sleepy and not exhausted
+
+
 func step(delta: float) -> void:
 	if terrain == null:
 		return
-	var dive := holding and not sleepy
-	var g := GRAVITY * (DIVE_MULT if dive else 1.0)
-	vel.y += g * delta
-	if not on_ground and not dive and vel.y > 0.0:
-		vel.y -= 180.0 * delta   # gentle glide lift
-	var drag := 0.00003 * vel.length()
+	var lifting := can_lift()
+	# stamina (with hysteresis: once empty, lift returns only at STAMINA_RESUME)
+	if lifting:
+		stamina = maxf(0.0, stamina - STAMINA_DRAIN * delta)
+		if stamina <= 0.0:
+			exhausted = true
+	elif not sleepy:
+		stamina = minf(1.0, stamina + (STAMINA_REGEN_GROUND if on_ground else STAMINA_REGEN_AIR) * delta)
+	if exhausted and stamina >= STAMINA_RESUME:
+		exhausted = false
+
+	# forward speed ramps up over distance
+	var target := lerpf(SPEED_START, SPEED_MAX, clampf(position.x / SPEED_RAMP_X, 0.0, 1.0))
+	if fever:
+		target *= 1.3
+	if on_ground:
+		target *= 0.85
 	if sleepy:
-		drag += 0.9 if on_ground else 0.25
-	vel *= max(0.0, 1.0 - drag * delta)
-	if not sleepy:
-		vel.x = max(vel.x, MIN_SPEED_X * (1.4 if fever else 1.0))
-	else:
-		vel.x = max(vel.x, 20.0)
-	if vel.length() > MAX_SPEED:
-		vel = vel.normalized() * MAX_SPEED
+		target *= 0.7
+	vel.x = move_toward(vel.x, target, SPEED_ACCEL * delta)
+
+	if on_ground and lifting:
+		on_ground = false
+		air_time = 0.0
+		max_air_height = 0.0
+		vel.y = minf(vel.y, -120.0)
+		took_off.emit()
+
+	# vertical: gravity, lift fading out between the soft and hard ceiling
+	vel.y += GRAVITY * delta
+	var lift_scale := 1.0 - clampf((CEILING_SOFT - position.y) / (CEILING_SOFT - CEILING_HARD), 0.0, 1.0)
+	if lifting:
+		vel.y -= LIFT * lift_scale * delta
+	vel.y = clampf(vel.y, -MAX_RISE * lift_scale if position.y < CEILING_SOFT else -MAX_RISE, MAX_FALL)
 
 	position += vel * delta
 	var h := terrain.height_at(position.x)
 	var slope := terrain.slope_at(position.x)
-	var tangent := Vector2(1.0, slope).normalized()
-
-	var stick := dive and on_ground and position.y > h - 10.0
+	var stick := on_ground and position.y > h - GROUND_STICK
 	if position.y >= h or stick:
 		if not on_ground:
-			_land(tangent, slope)
+			_land(slope)
 		position.y = h
-		var s := vel.dot(tangent)
-		vel = tangent * max(s, 40.0)
+		vel.y = vel.x * slope
 		on_ground = true
 	else:
-		if on_ground and position.y < h - 2.0:
-			on_ground = false
-			air_time = 0.0
-			max_air_height = 0.0
-			took_off.emit()
-		if not on_ground:
-			air_time += delta
-			max_air_height = max(max_air_height, h - position.y)
+		on_ground = false
+		air_time += delta
+		max_air_height = maxf(max_air_height, h - position.y)
 
 	var under := position.y > Terrain.WATER_Y + 4.0 and h > Terrain.WATER_Y
 	if under and not _was_underwater:
@@ -123,22 +153,17 @@ func step(delta: float) -> void:
 	_was_underwater = under
 
 
-func _land(tangent: Vector2, slope: float) -> void:
-	var dir := vel.normalized()
-	var align := dir.dot(tangent)
-	var quality := 1
-	if align > 0.97 and slope > 0.05:
-		quality = 2
-		vel = tangent * (vel.length() * 1.05 + 160.0)
-	elif align < 0.8 and slope < 0.1:
-		quality = 0
-		vel = tangent * vel.dot(tangent) * 0.65
-	_squash = Vector2(1.3, 0.72) if quality != 2 else Vector2(1.15, 0.85)
-	landed.emit(quality)
+func _land(slope: float) -> void:
+	var bonk := vel.y > BONK_FALL_SPEED or slope < BONK_SLOPE
+	if bonk:
+		vel.x *= 0.6
+	_squash = Vector2(1.3, 0.72) if bonk else Vector2(1.12, 0.88)
+	landed.emit(bonk)
 
 
 func _process(delta: float) -> void:
-	_flap += delta * (18.0 if (not on_ground and not holding) else 6.0)
+	var flapping := can_lift() and not preview
+	_flap += delta * (24.0 if flapping else (6.0 if on_ground or preview else 2.0))
 	_squash = _squash.lerp(Vector2.ONE, min(1.0, delta * 9.0))
 	if not preview:
 		var target_rot := atan2(vel.y, vel.x)
@@ -152,7 +177,6 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	var b: Color = skin.body
-	var tucked := holding and not preview
 	draw_set_transform(Vector2(0, -RADIUS * _squash.y), 0.0, _squash)
 	if fever or skin.glow:
 		var a := 0.22 + (0.1 * sin(_flap * 0.5) if fever else 0.0)
@@ -178,10 +202,13 @@ func _draw() -> void:
 				var cx := -6.0 + i * 8.0
 				draw_colored_polygon(PackedVector2Array([Vector2(cx - 4, -18), Vector2(cx, -32 - (4 if i == 1 else 0)), Vector2(cx + 4, -18)]), skin.feature_color)
 	# wing
-	var wing_ang := -0.4 + sin(_flap) * 0.7 if not tucked else 0.35
-	if on_ground and not preview:
-		wing_ang = 0.25
-	Art.leaf(self, Vector2(-4, -2), PI + wing_ang, 30.0 if not tucked else 22.0, 9.0, -0.6, skin.wing)
+	var wing_ang := -0.4 + sin(_flap) * 0.7
+	if not preview:
+		if on_ground:
+			wing_ang = 0.25
+		elif not can_lift():
+			wing_ang = -0.75 + sin(_flap) * 0.08   # spread, gliding
+	Art.leaf(self, Vector2(-4, -2), PI + wing_ang, 30.0, 9.0, -0.6, skin.wing)
 	# beak
 	draw_colored_polygon(PackedVector2Array([Vector2(18, -5), Vector2(34 if skin.feature != "casque" else 38, 1), Vector2(18, 6)]), skin.beak)
 	# eye
