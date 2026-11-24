@@ -57,6 +57,8 @@ tumbuh) dicatat sebagai tujuan jangka panjang, dan peta pulau ini nanti bisa men
 
 1. **Petualangan** (plan `2026-11-24-peta-petualangan.md`): level, peta, layar selesai, bintang.
 2. **Misi** (plan `2026-11-24-misi.md`).
+2b. **Perbaikan temuan** (plan `2026-11-24-perbaikan-temuan.md`): semua temuan kecil yang ditunda dari PR #7, #9, dan #10.
+   Atas permintaan pemilik repo, langkah ini dikerjakan sebelum semburan lava.
 3. Semburan lava, yang juga membuka level Gunung (`2026-11-24-semburan-lava.md`).
 4. Kawanan kelelawar, yang juga membuka level Danau (`2026-11-24-kelelawar-danau.md`).
 5. Gerbang awan petir, yang juga membuka level Awan (`2026-11-24-awan-petir.md`).
