@@ -442,3 +442,30 @@ func test_coin_items_sorted() -> String:
 		if bad >= 0:
 			return "%s: coin %d out of order" % [lv.id, bad]
 	return ""
+
+
+func test_magnet_past_gate_not_counted() -> String:
+	# a fever magnet drags coins that lie past the gate back to the bird: they must not count for the level
+	var g := _level_game("sawah-1")
+	var w: World = g.world
+	var fin := w.terrain.island_finish[0]
+	w.coins.add_item(Vector2(fin + 150.0, -300.0), CoinField.COIN)
+	w.coins.view_left = fin - 2000.0
+	var before: int = g.level_coins
+	for i in 60:
+		w.coins.check(Vector2(fin - 60.0, -300.0), 48.0, 230.0, DT)
+	return "" if g.level_coins == before else "past-gate coin counted: %d -> %d" % [before, g.level_coins]
+
+
+func test_map_scroll_passes_touch() -> String:
+	# drag-to-scroll on phones: nothing inside the map's ScrollContainer may swallow the drag
+	var m := _scene("res://scenes/level_map.tscn")
+	var bad := ""
+	var stack: Array = [m._scroll.get_child(0)]
+	while not stack.is_empty() and bad == "":
+		var n: Node = stack.pop_back()
+		if n is Control and (n as Control).mouse_filter == Control.MOUSE_FILTER_STOP:
+			bad = "%s (%s) stops mouse/touch" % [n.name, n.get_class()]
+		stack.append_array(n.get_children())
+	_free_node(m)
+	return bad

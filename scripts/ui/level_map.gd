@@ -57,6 +57,7 @@ func _build_ui() -> void:
 	# the island groups
 	_scroll = ScrollContainer.new()
 	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.scroll_deadzone = 12   # a tap on a level stays a tap; a drag scrolls
 	_scroll.anchor_right = 1.0
 	_scroll.anchor_bottom = 1.0
 	_scroll.offset_top = 130
@@ -75,6 +76,7 @@ func _build_ui() -> void:
 		row.add_child(g)
 	var pad2 := pad.duplicate()
 	row.add_child(pad2)
+	_pass_touch(row)
 	_scroll_to.call_deferred(scroll_target_index() / 3)
 
 
@@ -139,6 +141,15 @@ func _level_cell(i: int) -> Control:
 	tier.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	cell.add_child(tier)
 	return cell
+
+
+## Lets a finger drag anywhere on the map scroll it: nothing inside may stop the touch
+## (buttons still get their press with PASS).
+func _pass_touch(n: Node) -> void:
+	if n is Control and (n as Control).mouse_filter == Control.MOUSE_FILTER_STOP:
+		(n as Control).mouse_filter = Control.MOUSE_FILTER_PASS
+	for c in n.get_children():
+		_pass_touch(c)
 
 
 func _scroll_to(group: int) -> void:

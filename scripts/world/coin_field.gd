@@ -2,11 +2,11 @@ class_name CoinField
 extends Node2D
 ## All collectibles in one node: drawn in a single _draw pass and collected by distance.
 
-signal collected(kind: int, pos: Vector2)
+signal collected(kind: int, pos: Vector2)   # pos = where the coin was placed (before any magnet pull)
 
 const COIN := 0
 
-var items: Array = []        # [Vector2 pos, int kind, bool alive]
+var items: Array = []        # [Vector2 pos, int kind, bool alive, Vector2 home]
 var view_left := 0.0
 var view_right := 0.0
 var _first := 0
@@ -24,7 +24,7 @@ func add_item(p: Vector2, kind: int) -> void:
 			lo = mid + 1
 		else:
 			hi = mid
-	items.insert(lo, [p, kind, true])
+	items.insert(lo, [p, kind, true, p])
 	if lo < _first:
 		_first += 1
 
@@ -47,7 +47,7 @@ func check(bird_pos: Vector2, radius: float, magnet: float, delta: float) -> voi
 			if d < radius:
 				it[2] = false
 				_bursts.append([it[0], 0.0, it[1]])
-				collected.emit(it[1], it[0])
+				collected.emit(it[1], it[3])
 		i += 1
 
 
