@@ -6,7 +6,7 @@ Godot 4.7.2, GDScript, GL Compatibility renderer, landscape 1280x720 (stretch ca
 - No bitmap/audio assets except the font + `assets/audio/gamelan_loop.ogg`. All visuals are drawn in code (`scripts/world/art.gd`) or shaders (`shaders/`). Keep it that way: add new art as `Art.*` static helpers.
 - Scenes are thin: each `.tscn` is a root Node2D + script; UI is built in code via `UIKit` (`scripts/ui/ui_kit.gd`).
 - `World` (scripts/world/world.gd) is reused by game, menu and shop (menu/shop use `autoplay = true`, `input_enabled = false`).
-- Game rules (endless run — no timer, islands bonus, combos, fever, 3-button lose screen, continue on dry ground past kites) live in `scripts/ui/game.gd`; physics in `bird.gd`; terrain in `terrain.gd` (cosine-interpolated key points, islands separated by a sea at `boundaries`). Hazards: `sea_monster.gd`, `wave.gd` (Pantai bays: sky-high curling wall, pass through the tube under the curl), `kite.gd` (Sawah kites), wired in `World._update_hazards`.
+- Game rules (endless run — no timer, islands bonus, combos, fever, 3-button lose screen, continue on dry ground past kites) live in `scripts/ui/game.gd`; physics in `bird.gd`; terrain in `terrain.gd` (cosine-interpolated key points, islands separated by a sea at `boundaries`). Hazards: `sea_monster.gd`, `wave.gd` (Pantai bays: sky-high curling wall, pass through the tube under the curl), `kite.gd` (Sawah kites), wired in `World._update_hazards`. Newer per-island hazards (`canopy.gd` = Hutan tunnels, …) share one interface (`CAUSE`, `update`, `safe_x_after`, `reset_current`, `spotted`/`passed`) and live in `World._island_hazards`; their popups/rewards are `HAZARD_POPUPS`/`HAZARD_PASS` in `game.gd`, and "Lanjut" uses `World.safe_x_after`.
 - Content is data: islands in `scripts/data/biomes.gd`, skins in `scripts/data/skins.gd`.
 - Autoloads: `Game` (save/economy/dev flags/scene fade via `Game.goto(path)`), `Sfx` (`Sfx.play("coin")`), `Ads` (rewarded/interstitial/IAP facade — demo mode; integrate real plugins only inside ads.gd).
 
@@ -26,6 +26,7 @@ Godot 4.7.2, GDScript, GL Compatibility renderer, landscape 1280x720 (stretch ca
 - Screenshot: `... res://scenes/game.tscn -- --island=4 --autoplay --shot=out.png --shot-delay=8`
 - Kite screenshot (Sawah, fixed seed): `... res://scenes/game.tscn -- --island=0 --seed=4242 --autoplay --nosave --shot=out.png --shot-delay=7.5` (seed 7 + delay 12 = bird passing right under a tail).
 - Beach wave screenshot (Pantai, fixed seed): `... res://scenes/game.tscn -- --island=1 --seed=4242 --autoplay --nosave --shot=out.png --shot-delay=9` (delay 7.5 = curling wall ahead, 9 = bird inside the tube). `--seed=N` fixes the run seed.
+- Hutan canopy screenshot: `... res://scenes/game.tscn -- --island=2 --seed=4242 --autoplay --nosave --shot=out.png --shot-delay=7` (5 = warning popup with the roof edge at the right, 7 = bird at the tunnel mouth).
 
 ## Alur git per langkah
 
