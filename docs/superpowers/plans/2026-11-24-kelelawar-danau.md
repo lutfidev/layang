@@ -14,7 +14,7 @@ masuk tepi kanan layar.
 
 **Spec:** `docs/superpowers/specs/2026-11-24-rintangan-pulau-design.md` (bagian "Langkah 3").
 
-**Butuh:** langkah 1 sudah di-merge (antarmuka bersama). Langkah 2 tidak wajib.
+**Butuh:** langkah Petualangan dan Misi (`2026-11-24-peta-petualangan.md`, `2026-11-24-misi.md`) dan langkah 1 sudah di-merge (antarmuka bersama). Langkah 2 tidak wajib.
 
 ## Status
 
@@ -108,10 +108,26 @@ masuk tepi kanan layar.
 - [ ] **Step 4:** PASS.
 - [ ] **Step 5: Commit** `feat(game): bat death title, warning popup, pass points, continue past flocks`
 
+### Task 3b: Buka level Danau + misi
+
+**Files:**
+- Modify: `scripts/data/levels.gd` (`READY_ISLANDS` + `"danau"`, seed level danau-1..3 dikunci), `scripts/data/missions.gd` (templat `pass_kelelawar`: "Lolos %d kawanan kelelawar", target 3, hadiah 75, `island: "danau"`)
+- Test: `tests/test_levels.gd`, `tests/test_missions.gd`
+
+- [ ] **Step 1: Tes gagal:** `test_danau_levels_ready` (`Levels.is_ready` untuk `danau-1..3`; jumlah rintangan pulau 0 = tingkatnya: 1/2/3);
+  `test_danau_mission_available` (`Missions.available` untuk templat `pass_kelelawar` = true); `test_ready_levels_completable` mencakup level danau.
+  `hazard_passed("kelelawar")` menaikkan `pass` dan `pass_kelelawar`.
+- [ ] **Step 2:** FAIL.
+- [ ] **Step 3: Implementasi.** Jumlah rintangan pulau level memakai `terrain.level_hazards` seperti layangan/ombak/lorong.
+  Pilih seed danau-1..3 lewat sim `--level=danau-N --autoplay --sim` sampai `cause=selesai`. Tombol Lanjut di layar selesai level Badai
+  pulau sebelumnya otomatis aktif (pulau ini sekarang siap), dan tes `test_level_done_buttons` disesuaikan.
+- [ ] **Step 4:** PASS, semua `failed=0`.
+- [ ] **Step 5: Commit** `feat(game): unlock danau levels and kelelawar missions`
+
 ### Task 4: Verifikasi, screenshot, dokumen
 
 - [ ] **Step 1:** Cek wajib bersih.
-- [ ] **Step 2:** Sim `--island=4` dengan seed 11 dan 4242 → `cause=batas`.
+- [ ] **Step 2:** Sim level `--level=danau-1/2/3` → `cause=selesai`, lalu sim `--island=4` dengan seed 11 dan 4242 → `cause=batas`.
 - [ ] **Step 3:** Screenshot `--island=4 --seed=4242`: satu saat mata kawanan muncul di tepi kanan, satu saat burung lewat. Lihat gambarnya (mata harus terbaca di langit malam) dan catat perintahnya di CLAUDE.md.
 - [ ] **Step 4:** Tulis "Angka akhir langkah 3" di spec, centang plan, dan set status selesai.
 - [ ] **Step 5: Commit** `docs: bat step notes, plan status`, lalu push + PR.
