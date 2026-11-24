@@ -32,7 +32,11 @@ var current_island := 0
 var input_enabled := true
 var hazards := true        # false in menu / shop demo worlds: the sea just bounces the bird
 var dead := false
-var finished := false      # adventure level past its gate: nothing can kill the bird any more
+var finished := false:     # adventure level past its gate: nothing can kill the bird any more
+	set(v):
+		finished = v
+		if v and monster:
+			monster.reset()   # hazards stop updating once finished: never leave it frozen mid-jump
 var monster: SeaMonster
 var wave: Wave
 var kite: Kite

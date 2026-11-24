@@ -253,6 +253,8 @@ func _on_island(k: int, biome: Dictionary) -> void:
 
 
 func _on_item(_kind: int, pos: Vector2) -> void:
+	if state != "play":
+		return   # e.g. a fever magnet dragging coins in after "Level selesai!": counts nowhere
 	if not level.is_empty() and pos.x < world.terrain.island_finish[0]:
 		level_coins += 1
 	var gained := 2 if world.bird.fever else 1
@@ -333,8 +335,12 @@ func _on_kite_spotted() -> void:
 
 
 func _on_died(cause: String) -> void:
-	if state == "play":
-		_finish(cause)
+	if state != "play":
+		return
+	if not level.is_empty() and world.bird.position.x >= world.terrain.island_finish[0]:
+		_finish_level()   # hit on the frame it reached the gate: the level still counts
+		return
+	_finish(cause)
 
 
 ## "TERBANG TINGGI!" once per flight when the bird climbs high above the ground / water.
