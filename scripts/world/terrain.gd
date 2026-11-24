@@ -74,6 +74,10 @@ func height_at(x: float) -> float:
 	return keys_y[i] + (keys_y[i + 1] - keys_y[i]) * (1.0 - cos(PI * t)) * 0.5
 
 
+func is_sea_at(x: float) -> bool:
+	return height_at(x) > WATER_Y
+
+
 func slope_at(x: float) -> float:
 	if keys_x.is_empty() or x <= keys_x[0]:
 		return 0.0
@@ -159,11 +163,13 @@ func _generate_island() -> void:
 	island_finish.append(fx)
 	props.append({"x": fx, "kind": "gapura", "island": k, "s": 1.0})
 
-	# sea
+	# sea: gets wider further into the run (room for more sea-monster jumps)
 	var sea_x := fx + 1200.0
-	_add_key(Vector2(sea_x, SEA_FLOOR), k + 1)
-	boundaries.append(sea_x)
-	_build_water(fx, sea_x + 1100.0, biome)
+	var sea_len := 500.0 + minf(k + start_island, 6.0) * 320.0
+	_add_key(Vector2(sea_x, SEA_FLOOR), k)
+	_add_key(Vector2(sea_x + sea_len, SEA_FLOOR), k + 1)
+	boundaries.append(sea_x + sea_len * 0.5)
+	_build_water(fx, sea_x + sea_len + 1100.0, biome)
 
 	_place_items(k, hill_start_key, keys_x.size() - 3, rng, biome)
 	_islands_generated += 1

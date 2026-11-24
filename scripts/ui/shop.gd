@@ -17,6 +17,7 @@ func _ready() -> void:
 	world = World.new()
 	world.autoplay = true
 	world.input_enabled = false
+	world.hazards = false
 	world.start_island = Game.dev_int("island", 5)
 	world.sun_progress = 0.75
 	add_child(world)

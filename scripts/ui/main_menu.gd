@@ -12,6 +12,7 @@ func _ready() -> void:
 	world = World.new()
 	world.autoplay = true
 	world.input_enabled = false
+	world.hazards = false
 	world.start_island = Game.dev_int("island", randi() % Biomes.count())
 	world.sun_progress = 0.8
 	world.bird_screen_x = 0.66

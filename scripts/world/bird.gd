@@ -151,7 +151,7 @@ func step(delta: float) -> void:
 		on_ground = false
 		air_time += delta
 		max_air_height = maxf(max_air_height, h - position.y)
-		var in_zone := (h - position.y) < SKIM_HEIGHT and h < Terrain.WATER_Y
+		var in_zone := (h - position.y) < SKIM_HEIGHT and not terrain.is_sea_at(position.x)
 		if in_zone:
 			skim_t += delta
 		elif skim_t > 0.0:

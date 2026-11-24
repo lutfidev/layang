@@ -7,6 +7,7 @@ signal island_reached(k: int, biome: Dictionary)
 signal item_collected(kind: int, pos: Vector2)
 signal bird_landed(bonk: bool)
 signal bird_splashed
+signal bird_died(cause: String)        # "laut" | "monster"
 signal bird_skimmed(duration: float)
 
 var autoplay := false
@@ -25,6 +26,9 @@ var backdrop: Backdrop
 var ambient: Ambient
 var current_island := 0
 var input_enabled := true
+var hazards := true        # false in menu / shop demo worlds: the sea just bounces the bird
+var dead := false
+var monster: SeaMonster
 
 var _sky_mat: ShaderMaterial
 var _sky_rect: ColorRect
@@ -35,6 +39,9 @@ var _blend := 1.0
 var _zoom := 1.0
 var _touch_hold := false
 var _dusk := 0.0
+var _in_sea := false
+var _jumps_left := 0
+var _jump_cd := 0.0
 
 
 func _ready() -> void:
@@ -70,6 +77,8 @@ func _ready() -> void:
 	bird.terrain = terrain
 	bird.position = Vector2(-880, terrain.height_at(-880))
 	add_child(bird)
+	monster = SeaMonster.new()
+	add_child(monster)
 	camera = Camera2D.new()
 	add_child(camera)
 	camera.make_current()
@@ -116,19 +125,63 @@ func release_input() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if not running:
+	if not running or dead:
 		return
 	if autoplay:
 		bird.holding = _ai_hold()
 	else:
 		bird.holding = input_enabled and (_touch_hold or Input.is_action_pressed("fly"))
 	bird.step(delta)
+	_update_hazards(delta)
+	if dead:
+		return
 	coins.check(bird.center(), 48.0, 230.0 if bird.fever else 0.0, delta)
 	var k := terrain.island_at(bird.position.x)
 	if k > current_island:
 		current_island = k
 		_change_biome(Biomes.get_biome(start_island + k))
 		island_reached.emit(k, _biome_to)
+
+
+func _update_hazards(delta: float) -> void:
+	var x := bird.position.x
+	var over_sea := terrain.is_sea_at(x)
+	if not hazards:
+		if over_sea and bird.position.y > Terrain.WATER_Y - 30.0:
+			bird.vel.y = -Bird.MAX_RISE
+			bird.on_ground = false
+		return
+	if over_sea and not _in_sea:
+		_jumps_left = monster.jumps_for_island(start_island + terrain.island_at(x))
+		_jump_cd = 0.0
+	_in_sea = over_sea
+	_jump_cd -= delta
+	if over_sea and _jumps_left > 0 and _jump_cd <= 0.0 and monster.state == "idle":
+		var tx := x + bird.vel.x * (SeaMonster.WARN_TIME + 0.55)
+		if terrain.is_sea_at(tx - SeaMonster.SPAN * 0.5) and terrain.is_sea_at(tx + SeaMonster.SPAN * 0.5):
+			monster.arm(tx)
+			_jumps_left -= 1
+			_jump_cd = SeaMonster.WARN_TIME + SeaMonster.JUMP_TIME + 0.5
+	if monster.update(delta, bird.center()):
+		_die("monster")
+	elif over_sea and bird.center().y > Terrain.WATER_Y:
+		_die("laut")
+
+
+func _die(cause: String) -> void:
+	dead = true
+	if cause == "monster":
+		shake = 1.2
+		Sfx.play("chomp")
+		Ambient.burst(self, bird.center(), Color("#ffffff"), 22, 520.0)
+	bird_died.emit(cause)
+
+
+## Removes any active sea monster and its remaining jumps for this sea (used by "Lanjut terbang").
+func clear_hazards() -> void:
+	monster.reset()
+	_jumps_left = 0
+	_jump_cd = 0.0
 
 
 func _ai_hold() -> bool:
