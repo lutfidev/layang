@@ -277,3 +277,10 @@ tanah tidak berubah, jadi seed lama tetap menghasilkan pulau yang sama.
 
 Langkah 2–4 butuh langkah 1, karena antarmuka bersama dibuat di sana. Sesudahnya baru tahap 4 (riak monster) dan
 tahap 5 (urutan + kurva kesulitan) dari spec Tanpa Batas, yang sekarang mencakup keenam rintangan.
+
+### Urutan baru (2026-11-24, setelah playtest di HP)
+
+Pemilik repo meminta level bertahap dan misi (`2026-11-24-petualangan-design.md`). Urutannya sekarang:
+langkah 1 (lorong kanopi, PR #7) → **Petualangan** → **Misi** → langkah 2 lava → langkah 3 kelelawar → langkah 4 petir →
+langkah 5 musik. Langkah 2–4 juga membuka level pulaunya (`Levels.READY_ISLANDS`) dan menambah misi `pass_<rintangan>`
+(Task 3b di plan masing-masing).
