@@ -86,3 +86,82 @@ func test_no_ground_coins_or_props_in_bay() -> String:
 					return "seed %d: prop %s in bay" % [s, pr.kind]
 		_free(w)
 	return ""
+
+
+# ---------------------------------------------------------------- launch lip
+
+func _bird_on(w: World, x: float, ground: bool, y: float = 0.0) -> Bird:
+	var b := w.bird
+	b.position = Vector2(x, w.terrain.height_at(x) if ground else y)
+	b.on_ground = ground
+	b.vel = Vector2(0.85 * Bird.SPEED_START, 0.0)
+	b.holding = false
+	return b
+
+
+func test_lip_kicks_grounded_bird() -> String:
+	var w := _world(4242)
+	var lip: Dictionary = w.terrain.bays[0]
+	var b := _bird_on(w, lip.lip_x - 150.0, true)
+	var kicks: Array = []
+	b.kicked.connect(func(): kicks.append(b.vel.y))
+	var kick_vy := 0.0
+	while b.position.x < lip.lip_x + Terrain.KICK_AFTER + 20.0:
+		var before := kicks.size()
+		b.step(DT)
+		if kicks.size() > before:
+			kick_vy = b.vel.y
+			if b.on_ground:
+				return "still on ground after kick"
+	if kicks.size() != 1:
+		return "kicks=%d" % kicks.size()
+	return "" if kick_vy <= -Bird.LIP_KICK + Bird.GRAVITY * DT * 2.0 else "kick vel.y=%f" % kick_vy
+
+
+func test_airborne_bird_not_kicked() -> String:
+	var w := _world(4242)
+	var lip: Dictionary = w.terrain.bays[0]
+	var b := _bird_on(w, lip.lip_x - 100.0, false, Terrain.LIP_Y - 40.0)
+	var kicks := [0]
+	b.kicked.connect(func(): kicks[0] += 1)
+	while b.position.x < lip.lip_x + 60.0:
+		b.position.y = Terrain.LIP_Y - 40.0
+		b.vel.y = 0.0
+		b.step(DT)
+	return "" if kicks[0] == 0 else "kicked while airborne"
+
+
+func test_bank_landing_is_soft() -> String:
+	var w := _world(4242)
+	var t := w.terrain
+	var bay: Dictionary = t.bays[0]
+	var x: float = bay.water_x1 + 2.0
+	while x < bay.bank_x and t.slope_at(x) >= Bird.BONK_SLOPE:
+		x += 4.0
+	if x >= bay.bank_x:
+		return "no steep spot on bank (test vacuous)"
+	var b := _bird_on(w, x, false, t.height_at(x) - 3.0)
+	b.vel = Vector2(0.0, Bird.MAX_FALL)
+	var got: Array = []
+	b.landed.connect(func(bonk: bool): got.append(bonk))
+	for i in 10:
+		b.step(DT)
+		if not got.is_empty():
+			break
+	return "" if got == [false] else "landed=%s" % [got]
+
+
+func test_no_skim_over_bay() -> String:
+	var w := _world(4242)
+	var bay: Dictionary = w.terrain.bays[0]
+	var b := _bird_on(w, bay.water_x0, false, Terrain.WATER_Y - 40.0)
+	var skims := [0]
+	b.skimmed.connect(func(_d: float): skims[0] += 1)
+	b.vel.x = 120.0   # slow: long enough over the water to count as a skim
+	while b.position.x < bay.water_x1:
+		b.position.y = Terrain.WATER_Y - 40.0
+		b.vel = Vector2(120.0, 0.0)
+		b.step(DT)
+	b.position.y = Terrain.WATER_Y - 400.0
+	b.step(DT)
+	return "" if skims[0] == 0 else "skimmed over bay water"

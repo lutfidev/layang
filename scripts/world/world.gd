@@ -98,6 +98,7 @@ func _ready() -> void:
 	bird.landed.connect(_on_landed)
 	bird.splashed.connect(_on_splash)
 	bird.skimmed.connect(func(d: float): bird_skimmed.emit(d))
+	bird.kicked.connect(func(): Sfx.play("whoosh", 1.3))
 
 	_biome_to = Biomes.get_biome(start_island)
 	_biome_from = _biome_to

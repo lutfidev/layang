@@ -251,3 +251,26 @@ static func shadow(ci: CanvasItem, c: Vector2, rx: float, ry: float, alpha: floa
 	for i in 3:
 		var k := 1.0 - i * 0.28
 		ellipse(ci, c, rx * k, ry * k, Color(0.05, 0.02, 0.12, alpha * 0.4), rot)
+
+
+## Launch lip marking: a bright band along the ground surface plus three pulsing chevrons
+## pointing up the ramp, so players read it as "touch here to be flung up".
+static func launch_ramp(ci: CanvasItem, surface: PackedVector2Array, col: Color, edge: Color, t: float) -> void:
+	if surface.size() < 2:
+		return
+	var band := PackedVector2Array(surface)
+	for i in range(surface.size() - 1, -1, -1):
+		band.append(surface[i] + Vector2(0, 16))
+	ci.draw_colored_polygon(band, col)
+	ci.draw_polyline(surface, edge, 4.0, true)
+	var n := surface.size()
+	for k in 3:
+		var u := fmod(t * 0.9 + k / 3.0, 1.0)
+		var i := clampi(int(u * (n - 1)), 0, n - 2)
+		var p := surface[i]
+		var dir := (surface[i + 1] - surface[i]).normalized().rotated(-0.6)
+		var nrm := dir.orthogonal()
+		var a := sin(u * PI)
+		var c := Color(1, 1, 1, 0.9 * a)
+		var tip := p + Vector2(0, -26) + dir * 12.0
+		ci.draw_polyline(PackedVector2Array([tip - dir * 14.0 + nrm * 11.0, tip, tip - dir * 14.0 - nrm * 11.0]), c, 5.0, true)

@@ -18,6 +18,8 @@ const BANK_Y := 40.0
 const KICK_BEFORE := 40.0
 const KICK_AFTER := 10.0
 const NEXT_BAY_MARGIN := 70.0   # = Wave.WAVE_HALF
+const LIP_COLOR := Color("#ff7a59")
+const LIP_EDGE := Color("#ffe066")
 
 var run_seed: int = 1
 var start_island: int = 0
@@ -399,6 +401,16 @@ class PropsLayer:
 		if terrain == null:
 			return
 		var t := Time.get_ticks_msec() / 1000.0
+		for bay in terrain.bays:
+			var lx: float = bay.lip_x
+			if lx < view_left - 400.0 or lx > view_right + 400.0:
+				continue
+			var surf := PackedVector2Array()
+			var sx := lx - 220.0
+			while sx <= lx + KICK_AFTER:
+				surf.append(Vector2(sx, terrain.height_at(sx)))
+				sx += 14.0
+			Art.launch_ramp(self, surf, LIP_COLOR, LIP_EDGE, t)
 		for p in terrain.props:
 			var x: float = p.x
 			if x < view_left - 300.0 or x > view_right + 300.0:

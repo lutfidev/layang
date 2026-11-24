@@ -6,6 +6,7 @@ signal landed(bonk: bool)
 signal took_off
 signal splashed
 signal skimmed(duration: float)    # flew low over land long enough ("NYEREMPET")
+signal kicked                      # flung up by a bay's launch lip
 
 const GRAVITY := 1300.0
 const LIFT := 2900.0
@@ -27,6 +28,7 @@ const GROUND_STICK := 12.0
 const SKIM_HEIGHT := 90.0
 const SKIM_MIN_TIME := 0.6
 const RADIUS := 22.0
+const LIP_KICK := 620.0            # upward speed from a bay's launch lip (= MAX_RISE)
 
 var terrain: Terrain
 var vel := Vector2(360, 0)
@@ -151,13 +153,21 @@ func step(delta: float) -> void:
 		on_ground = false
 		air_time += delta
 		max_air_height = maxf(max_air_height, h - position.y)
-		var in_zone := (h - position.y) < SKIM_HEIGHT and not terrain.is_sea_at(position.x)
+		var in_zone := (h - position.y) < SKIM_HEIGHT and not terrain.is_water_at(position.x)
 		if in_zone:
 			skim_t += delta
 		elif skim_t > 0.0:
 			if skim_t >= SKIM_MIN_TIME:
 				skimmed.emit(skim_t)
 			skim_t = 0.0
+
+	if on_ground and terrain.kick_at(position.x):
+		on_ground = false
+		air_time = 0.0
+		max_air_height = 0.0
+		vel.y = -LIP_KICK
+		position.y -= GROUND_STICK + 1.0
+		kicked.emit()
 
 	var under := position.y > Terrain.WATER_Y + 4.0 and h > Terrain.WATER_Y
 	if under and not _was_underwater:
@@ -166,7 +176,7 @@ func step(delta: float) -> void:
 
 
 func _land(slope: float) -> void:
-	var bonk := vel.y > BONK_FALL_SPEED or slope < BONK_SLOPE
+	var bonk := (vel.y > BONK_FALL_SPEED or slope < BONK_SLOPE) and not terrain.soft_landing_at(position.x)
 	if bonk:
 		vel.x *= 0.6
 	_squash = Vector2(1.3, 0.72) if bonk else Vector2(1.12, 0.88)
