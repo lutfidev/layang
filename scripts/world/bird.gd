@@ -200,8 +200,9 @@ func _draw() -> void:
 			Art.leaf(self, Vector2(-16, 4), a2, 46.0, 5.0, -0.5, skin.feature_color)
 	draw_colored_polygon(PackedVector2Array([Vector2(-16, -4), Vector2(-36, -12), Vector2(-34, 4), Vector2(-16, 8)]), skin.wing)
 	# body
-	draw_circle(Vector2.ZERO, RADIUS, b)
+	Art.ball(self, Vector2.ZERO, RADIUS, b)
 	Art.ellipse(self, Vector2(4, 8), 15, 10, skin.belly)
+	Art.ellipse(self, Vector2(4, 13), 12, 4, Color(0, 0, 0, 0.08))
 	# casque / crest / crown (behind eye, on head)
 	match String(skin.feature):
 		"crest":
@@ -220,6 +221,7 @@ func _draw() -> void:
 			wing_ang = 0.25
 		elif not can_lift():
 			wing_ang = -0.75 + sin(_flap) * 0.08   # spread, gliding
+	Art.leaf(self, Vector2(-4, 0), PI + wing_ang, 30.0, 9.0, -0.6, (skin.wing as Color).darkened(0.3))
 	Art.leaf(self, Vector2(-4, -2), PI + wing_ang, 30.0, 9.0, -0.6, skin.wing)
 	# beak
 	draw_colored_polygon(PackedVector2Array([Vector2(18, -5), Vector2(34 if skin.feature != "casque" else 38, 1), Vector2(18, 6)]), skin.beak)

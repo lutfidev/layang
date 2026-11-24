@@ -91,16 +91,23 @@ func _draw() -> void:
 			draw_circle(Vector2(bx, by), 7.0 + 6.0 * (1.0 - ph), Color(1, 1, 1, 0.85 * (1.0 - ph)))
 		return
 	# body humps (back to front), only the parts above the water
+	var head := path_at(t)
+	var height := wy - head.y
+	if height > 0.0:
+		Art.shadow(self, Vector2(head.x, wy + 4.0), 70.0 + height * 0.08, 12.0, clampf(0.5 - height / 1400.0, 0.1, 0.5))
 	for i in range(SEGMENTS, 0, -1):
 		var p := path_at(t - SEG_LAG * i)
 		var r := 50.0 - i * 2.6
-		if p.y - r < wy:
-			draw_circle(p, r, BODY)
+		if p.y - r >= wy:
+			draw_circle(p, r, Color(0.06, 0.04, 0.2, 0.35))   # still under water
+		else:
+			Art.ball(self, p, r, BODY)
 			draw_circle(p + Vector2(0, r * 0.35), r * 0.62, BELLY)
 			if i % 2 == 0:
 				draw_colored_polygon(PackedVector2Array([p + Vector2(-12, -r + 4), p + Vector2(0, -r - 18), p + Vector2(12, -r + 4)]), BODY.lightened(0.25))
-	var head := path_at(t)
 	var p01 := clampf(t / JUMP_TIME, 0.0, 1.0)
 	var mouth := clampf(1.0 - absf(p01 - 0.5) * 3.0, 0.0, 1.0)
-	if head.y - 80.0 < wy:
+	if head.y - 80.0 >= wy:
+		Art.ellipse(self, head, 64.0, 56.0, Color(0.06, 0.04, 0.2, 0.35))
+	else:
 		Art.sea_monster(self, head, 1.15, BODY, BELLY, mouth, _anim)

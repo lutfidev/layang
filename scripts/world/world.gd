@@ -81,6 +81,9 @@ func _ready() -> void:
 	add_child(bird)
 	monster = SeaMonster.new()
 	add_child(monster)
+	var shade := BirdShadow.new()
+	shade.world = self
+	add_child(shade)
 	camera = Camera2D.new()
 	add_child(camera)
 	camera.make_current()
@@ -297,3 +300,28 @@ func _on_landed(bonk: bool) -> void:
 func _on_splash() -> void:
 	Ambient.burst(self, Vector2(bird.position.x, Terrain.WATER_Y), (_biome_to.water_top as Color), 26, 620.0)
 	bird_splashed.emit()
+
+
+
+## Soft shadow under the bird on the ground or the water: smaller and darker the closer it flies.
+class BirdShadow:
+	extends Node2D
+	var world: World
+
+	func _ready() -> void:
+		z_index = 1
+
+	func _process(_d: float) -> void:
+		queue_redraw()
+
+	func _draw() -> void:
+		var b := world.bird
+		var x := b.position.x
+		var sea := world.terrain.is_sea_at(x)
+		var gy := Terrain.WATER_Y + 2.0 if sea else world.terrain.height_at(x)
+		var h := gy - b.position.y
+		if h > 900.0 or h < -4.0:
+			return
+		var k := clampf(h / 900.0, 0.0, 1.0)
+		var rot := 0.0 if sea else atan(world.terrain.slope_at(x))
+		Art.shadow(self, Vector2(x, gy + 2.0), 34.0 * (1.0 + k * 0.8), 8.0 * (1.0 + k * 0.4), 0.55 * (1.0 - k), rot)

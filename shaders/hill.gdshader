@@ -10,9 +10,13 @@ uniform float stripe_w = 60.0;
 uniform float glow_rim = 0.0;     // night islands get a glowing rim
 
 varying vec2 wpos;
+uniform float light_x = 0.6;     // sun direction: <0 sun on the left, >0 on the right
+
+varying float slope;  // surface slope, packed in vertex color red
 
 void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy;
+	slope = (COLOR.r - 0.5) / 0.4;
 }
 
 void fragment() {
@@ -32,8 +36,16 @@ void fragment() {
 	}
 	vec3 c = mix(col_a.rgb, col_b.rgb, s * 0.9);
 	c = mix(c, col_deep.rgb, smoothstep(30.0, 760.0, d));
+	// slope lighting: strongest near the surface, fading into the hill body
+	vec2 n = normalize(vec2(slope, -1.0));
+	float lit = dot(n, normalize(vec2(light_x, -1.0)));
+	float sun = smoothstep(0.35, 1.0, lit);
+	float near = 1.0 - smoothstep(40.0, 520.0, d);
+	c *= mix(1.0, mix(0.72, 1.1, sun), near);
+	// soft inner shadow under the rim gives the surface some thickness
+	c *= 1.0 - 0.18 * smoothstep(14.0, 22.0, d) * (1.0 - smoothstep(22.0, 90.0, d));
 	float rim = 1.0 - smoothstep(9.0, 15.0, d);
-	c = mix(c, col_top.rgb, rim);
+	c = mix(c, mix(col_top.rgb * 0.85, col_top.rgb * 1.08, sun), rim);
 	float shade = smoothstep(15.0, 30.0, d) * (1.0 - smoothstep(30.0, 70.0, d));
 	c *= 1.0 - shade * 0.12;
 	c += col_top.rgb * glow_rim * (1.0 - smoothstep(0.0, 26.0, d)) * 0.35;

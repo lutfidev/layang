@@ -218,6 +218,7 @@ func _material_for(island: int) -> ShaderMaterial:
 	m.set_shader_parameter("col_top", b.hill_top)
 	m.set_shader_parameter("col_deep", b.hill_deep)
 	m.set_shader_parameter("pattern", int(b.pattern))
+	m.set_shader_parameter("light_x", (float(b.sun_x) - 0.5) * 1.6)
 	m.set_shader_parameter("stripe_w", float(b.stripe_w))
 	m.set_shader_parameter("glow_rim", 1.0 if b.id == "danau" or b.id == "gunung" else 0.0)
 	_materials[island] = m
@@ -232,6 +233,7 @@ func _build_segment(idx: int) -> void:
 	var n := int(ceil((x1 - x0) / SAMPLE))
 	var verts := PackedVector2Array()
 	var uvs := PackedVector2Array()
+	var cols := PackedColorArray()
 	for j in n + 1:
 		var x := lerpf(x0, x1, float(j) / n)
 		var t := float(j) / n
@@ -240,10 +242,16 @@ func _build_segment(idx: int) -> void:
 		uvs.append(Vector2(x, 0.0))
 		verts.append(Vector2(x, h + DEPTH))
 		uvs.append(Vector2(x, DEPTH))
+		# surface slope packed into the vertex color (red = 0.5 + slope * 0.4) for hill.gdshader lighting
+		var s := (keys_y[idx + 1] - keys_y[idx]) * PI * sin(PI * t) / (2.0 * (x1 - x0))
+		var c := Color(clampf(0.5 + s * 0.4, 0.0, 1.0), 0, 0, 1)
+		cols.append(c)
+		cols.append(c)
 	var arr := []
 	arr.resize(Mesh.ARRAY_MAX)
 	arr[Mesh.ARRAY_VERTEX] = verts
 	arr[Mesh.ARRAY_TEX_UV] = uvs
+	arr[Mesh.ARRAY_COLOR] = cols
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLE_STRIP, arr)
 	var mi := MeshInstance2D.new()
