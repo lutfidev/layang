@@ -67,19 +67,29 @@ tetap seperti sekarang.
 
 ## Antarmuka bersama (keputusan saya)
 
-Tiap node rintangan baru (`Canopy`, `LavaVent`, `BatFlock`, `StormGate`) adalah `Node2D` dengan:
+Tiap node rintangan baru (`Canopy`, `LavaVent`, `BatFlock`, `StormGate`) adalah `Node2D` dengan antarmuka yang
+sama seperti `scripts/world/canopy.gd` (acuan untuk langkah berikutnya):
 
-- `var terrain: Terrain`, `var view_left/view_right: float`, `var hazards := true`
-- `signal spotted` (dipancarkan sekali per run saat rintangan pertama ≤ `SPOT_DIST` di depan burung)
-- `func update(delta: float, bird_center: Vector2, bird_x: float, bird_on_ground: bool) -> bool`, yang mengembalikan true kalau kena
-- `func safe_x_after(x: float) -> float`, yang memajukan x melewati rintangan untuk Lanjut
-- `func reset_current() -> void`, yang membersihkan keadaan animasi rintangan terdekat saat Lanjut
-- `const CAUSE: String`, `var hit_color: Color`
-- statis `span(item) -> Vector2` (rentang x tempat rintangan bisa mengenai) dan `hits(item, t, p) -> bool`
+- `var terrain: Terrain` (diisi `World._add_island_hazard`), `var view_left/view_right: float` (diisi `World._process`
+  dari kamera). Node tidak punya `hazards` sendiri: `World` yang menahan sinyal kalau `hazards` false atau burung mati.
+- `const CAUSE: String`, dan `var hit_color: Color` = warna percikan saat burung mati di rintangan ini
+  (`World._die` memakainya untuk semua `_island_hazards`).
+- `signal spotted`: sekali per run saat rintangan pertama ≤ `SPOT_DIST` di depan burung.
+- `signal passed`: sekali per rintangan saat burung keluar dari sisi kanannya tanpa kena. `World` meneruskannya sebagai
+  `hazard_passed(CAUSE)`, yang mengisi misi `pass` dan `pass_<cause>`.
+- `func update(delta: float, bird_center: Vector2, bird_x: float, bird_on_ground: bool) -> bool`: true kalau kena.
+  `update` hanya memanggil `queue_redraw()` kalau ada rintangan di layar (plus satu kali setelah yang terakhir keluar).
+- `func safe_x_after(x: float) -> float`: memajukan x melewati rintangan untuk Lanjut. Bandingkan dengan nilai float
+  dari data (`c.x0`, `c.x1`), bukan `span()`, karena `Vector2` memakai float32.
+- `func reset_current() -> void`: membersihkan keadaan animasi rintangan terdekat saat Lanjut (boleh kosong kalau
+  rintangannya diam).
+- statis `span(item) -> Vector2` (rentang x tempat rintangan bisa mengenai) dan `hits(...) -> bool`. Parameter `hits`
+  boleh berbeda per rintangan (Canopy: `hits(terrain, item, p, on_ground)`).
 
 `World` menyimpan `_island_hazards: Array[Node2D]`, memanggil `update` untuk semuanya, dan `_die(h.CAUSE)` saat kena.
-`game.gd` mengambil judul/saran dari `CAUSE_TITLES`/`CAUSE_TIPS`. Lanjut memanggil `safe_x_after` semua rintangan
-sampai x tidak berubah lagi, karena satu rintangan bisa mendorong burung ke rintangan lain.
+`game.gd` mengambil judul/saran dari `CAUSE_TITLES`/`CAUSE_TIPS`, popup pertama dari `HAZARD_POPUPS`, dan hadiah lolos
+dari `HAZARD_PASS`. Lanjut memanggil `World.safe_x_after`, yang mengulang `safe_x_after` semua rintangan sampai x tidak
+berubah lagi, karena satu rintangan bisa mendorong burung ke rintangan lain.
 
 Penempatan tiap rintangan memakai RNG terpisah per pulau (seperti layangan: `run_seed * P + k * Q` dengan bilangan
 prima baru per rintangan), lewat `Terrain.pick_hills`: **tidak di 2 bukit pertama, tidak berurutan**. RNG bentuk

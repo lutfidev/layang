@@ -281,10 +281,12 @@ func _die(cause: String) -> void:
 		shake = 0.8
 		Sfx.play("bonk")
 		Ambient.burst(self, bird.center(), kite.hit_color, 26, 520.0)
-	elif cause == "hutan":
-		shake = 0.8
-		Sfx.play("bonk")
-		Ambient.burst(self, bird.center(), (_biome_to.hill_top as Color), 26, 480.0)
+	else:
+		for h in _island_hazards:
+			if h.CAUSE == cause:   # island hazards burst in their own hit colour
+				shake = 0.8
+				Sfx.play("bonk")
+				Ambient.burst(self, bird.center(), h.hit_color, 26, 480.0)
 	bird_died.emit(cause)
 
 
