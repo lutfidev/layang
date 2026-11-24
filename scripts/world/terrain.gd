@@ -7,7 +7,7 @@ const DEPTH := 1700.0
 const SEA_FLOOR := 470.0
 const WATER_Y := 300.0
 const SAMPLE := 14.0
-# Pantai bays: water-filled valleys with a launch lip before them (see Bird.LIP_KICK)
+# Pantai bays: water-filled valleys behind a lip; a curling wave (see Wave) stands over each one
 const BAYS_PER_ISLAND := 3
 const BAY_VALLEY_Y := 60.0
 const LIP_Y := -60.0
@@ -15,10 +15,6 @@ const LIP_RAMP := 480.0
 const BAY_FLOOR_Y := 380.0
 const BAY_HALF := 300.0
 const BANK_Y := 40.0
-const KICK_BEFORE := 40.0
-const KICK_AFTER := 10.0
-const LIP_COLOR := Color("#ff7a59")
-const LIP_EDGE := Color("#ffe066")
 # Sawah kites: villagers' kites hang over chosen peaks (see Kite); a coin arc runs over each one
 const KITES_PER_ISLAND := 2
 const KITE_ARC_COINS := 10
@@ -117,17 +113,9 @@ func bay_at(x: float) -> int:
 ## The first bay the bird at x has not fully passed yet, or -1.
 func next_bay(x: float) -> int:
 	for i in bays.size():
-		if bays[i].water_x1 + Wave.WAVE_HALF > x:
+		if bays[i].water_x1 + Wave.COL_PAD > x:
 			return i
 	return -1
-
-
-## True on the launch zone at the top of a bay's lip.
-func kick_at(x: float) -> bool:
-	for b in bays:
-		if x >= b.lip_x - KICK_BEFORE and x <= b.lip_x + KICK_AFTER:
-			return true
-	return false
 
 
 ## True on the far bank of a bay, where a landing never counts as a bonk.
@@ -145,7 +133,7 @@ func dry_ground_after(x: float) -> float:
 	while x < limit and is_water_at(x):
 		x += 10.0
 	x += 120.0
-	while x < limit and (is_water_at(x) or slope_at(x) < -0.3 or kick_at(x)):
+	while x < limit and (is_water_at(x) or slope_at(x) < -0.3):
 		x += 10.0
 	return x
 
@@ -439,16 +427,6 @@ class PropsLayer:
 		if terrain == null:
 			return
 		var t := Time.get_ticks_msec() / 1000.0
-		for bay in terrain.bays:
-			var lx: float = bay.lip_x
-			if lx < view_left - 400.0 or lx > view_right + 400.0:
-				continue
-			var surf := PackedVector2Array()
-			var sx := lx - 220.0
-			while sx <= lx + KICK_AFTER:
-				surf.append(Vector2(sx, terrain.height_at(sx)))
-				sx += 14.0
-			Art.launch_ramp(self, surf, LIP_COLOR, LIP_EDGE, t)
 		for p in terrain.props:
 			var x: float = p.x
 			if x < view_left - 300.0 or x > view_right + 300.0:

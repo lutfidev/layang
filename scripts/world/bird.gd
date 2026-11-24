@@ -6,7 +6,6 @@ signal landed(bonk: bool)
 signal took_off
 signal splashed
 signal skimmed(duration: float)    # flew low over land long enough ("NYEREMPET")
-signal kicked                      # flung up by a bay's launch lip
 
 const GRAVITY := 1300.0
 const LIFT := 2900.0
@@ -28,7 +27,6 @@ const GROUND_STICK := 12.0
 const SKIM_HEIGHT := 90.0
 const SKIM_MIN_TIME := 0.6
 const RADIUS := 22.0
-const LIP_KICK := 620.0            # upward speed from a bay's launch lip (= MAX_RISE)
 
 var terrain: Terrain
 var vel := Vector2(360, 0)
@@ -46,7 +44,6 @@ var skin: Dictionary = {}
 var _flap := 0.0
 var _squash := Vector2.ONE
 var _was_underwater := false
-var _kick_flight := false          # airborne after a lip kick: the landing is always soft
 var _trail: Line2D
 var _glow: Node2D
 
@@ -159,15 +156,6 @@ func step(delta: float) -> void:
 				skimmed.emit(skim_t)
 			skim_t = 0.0
 
-	if on_ground and terrain.kick_at(position.x):
-		on_ground = false
-		air_time = 0.0
-		max_air_height = 0.0
-		vel.y = -LIP_KICK
-		_kick_flight = true
-		position.y -= GROUND_STICK + 1.0
-		kicked.emit()
-
 	var under := position.y > Terrain.WATER_Y + 4.0 and h > Terrain.WATER_Y
 	if under and not _was_underwater:
 		splashed.emit()
@@ -175,8 +163,7 @@ func step(delta: float) -> void:
 
 
 func _land(slope: float) -> void:
-	var bonk := (vel.y > BONK_FALL_SPEED or slope < BONK_SLOPE) and not terrain.soft_landing_at(position.x) and not _kick_flight
-	_kick_flight = false
+	var bonk := (vel.y > BONK_FALL_SPEED or slope < BONK_SLOPE) and not terrain.soft_landing_at(position.x)
 	if bonk:
 		vel.x *= 0.6
 	_squash = Vector2(1.3, 0.72) if bonk else Vector2(1.12, 0.88)
