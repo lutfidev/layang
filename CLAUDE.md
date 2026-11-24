@@ -16,6 +16,7 @@ Godot 4.7.2, GDScript, GL Compatibility renderer, landscape 1280x720 (stretch ca
 - Fredoka font is a latin subset: avoid symbols like ▶ ★ ← (they render as boxes).
 
 ## Testing
+- `godot` is not on PATH: use `/d/Tools/Godot/Godot_v4.7.2-stable_win64_console.exe` (Bash) or `D:ToolsGodotGodot_v4.7.2-stable_win64_console.exe`.
 - Unit tests: `godot --headless --path . res://tests/run_tests.tscn` (add `-- --only=name` to filter) prints `TESTS passed=N failed=M`. New `class_name` scripts need `godot --headless --path . --import` once first.
 - Pass `--nosave` to sims/screenshots so they never overwrite the player's save (`--fresh` only skips loading).
 - Sea monster screenshot scene: `res://tests/monster_shot.tscn -- --shot=out.png --shot-delay=1.6`
