@@ -12,10 +12,10 @@
 
 ## Status (2026-11-24)
 
-- Spec dan rencana **disetujui user**. Belum ada kode yang diubah — mulai dari Task 1.
-- User sedang setup git; setelah repo ada, langkah commit di tiap task berlaku.
-- Metode eksekusi belum dipilih: rekomendasi **Native** (superpowers:executing-plans) karena task saling bergantung dan tuning butuh iterasi sim/screenshot. Konfirmasi ke user sebelum mulai.
-- Keputusan desain dari diskusi: tahan = naik (bukan ketuk/flappy), jatuh ke laut = run langsung selesai, rintangan laut = "monster laut" fiksi (bulat, lucu, bergigi besar) dengan peringatan ~1 dtk.
+- **Selesai** di branch `tahan-naik` (Task 1–5, 23 tes hijau). Belum di-merge ke `main`.
+- Penyimpangan dari rencana (lihat pesan commit): laut makin lebar per pulau, pulau lebih pendek
+  (9+k bukit), kecepatan 420→740, peringatan laut pertama 1,4 dtk, respawn "Lanjut" 900 px di atas air,
+  flag dev `--nosave`.
 
 ## Global Constraints
 
