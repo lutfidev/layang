@@ -122,3 +122,54 @@ func test_badai_speed_and_storm() -> String:
 	var s2 := p.bird.speed_scale
 	_free(p)
 	return "" if amb2 == "seeds" and s2 == 1.0 else "pagi: ambient %s speed %f" % [amb2, s2]
+
+
+# ---------------------------------------------------------------- stars + unlocks (Task 2)
+
+func _with_stars(stars: Dictionary, f: Callable) -> String:
+	var keep: Dictionary = Game.level_stars.duplicate()
+	Game.level_stars = stars.duplicate()
+	var r: String = f.call()
+	Game.level_stars = keep
+	return r
+
+
+func test_unlock_rules() -> String:
+	return _with_stars({}, func() -> String:
+		if not Game.is_unlocked("sawah-1"):
+			return "sawah-1 locked on a fresh save"
+		if Game.is_unlocked("sawah-2"):
+			return "sawah-2 open without stars"
+		Game.level_stars = {"sawah-1": 1}
+		if not Game.is_unlocked("sawah-2") or Game.is_unlocked("sawah-3"):
+			return "after sawah-1: sawah-2 %s sawah-3 %s" % [Game.is_unlocked("sawah-2"), Game.is_unlocked("sawah-3")]
+		Game.level_stars = {"sawah-1": 3, "sawah-2": 1, "sawah-3": 2, "pantai-1": 1, "pantai-2": 1, "pantai-3": 1, "hutan-1": 1, "hutan-2": 1, "hutan-3": 1}
+		if not Game.is_unlocked("hutan-3"):
+			return "hutan-3 locked"
+		if Game.is_unlocked("gunung-1"):
+			return "gunung-1 open but gunung is not ready"
+		if Game.total_stars() != 12:
+			return "total_stars %d" % Game.total_stars()
+		return "" if Game.last_unlocked_index() == 8 else "last_unlocked_index %d" % Game.last_unlocked_index())
+
+
+func test_record_level_new_stars_only() -> String:
+	return _with_stars({}, func() -> String:
+		var a := Game.record_level("sawah-1", 2)
+		var b := Game.record_level("sawah-1", 2)
+		var c := Game.record_level("sawah-1", 3)
+		var d := Game.record_level("sawah-1", 1)
+		if [a, b, c, d] != [2, 0, 1, 0]:
+			return "new stars %s" % [[a, b, c, d]]
+		return "" if int(Game.level_stars["sawah-1"]) == 3 else "kept %d" % int(Game.level_stars["sawah-1"]))
+
+
+func test_old_save_loads() -> String:
+	var keep := Game.save_data()
+	var old := keep.duplicate()
+	old.erase("level_stars")
+	Game.level_stars = {"x": 1}
+	Game.apply_save(old)
+	var got: Dictionary = Game.level_stars.duplicate()
+	Game.apply_save(keep)
+	return "" if got.is_empty() else "level_stars %s" % got
