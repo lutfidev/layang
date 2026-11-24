@@ -472,3 +472,38 @@ static func villager(ci: CanvasItem, base: Vector2, s: float, col: Color) -> Vec
 	# caping (conical farmer's hat)
 	ci.draw_colored_polygon(PackedVector2Array([base + Vector2(-14, -49) * s, base + Vector2(0, -60) * s, base + Vector2(14, -49) * s]), Color("#e8c46a"))
 	return hand
+
+
+static func canopy_roof(ci: CanvasItem, edge: PackedVector2Array, top_y: float, dark: Color, leaf: Color, t: float) -> void:
+	# Hutan roof: a dark mass of branches down to `edge`, a bumpy fringe of leaves and a few short vines.
+	if edge.size() < 2:
+		return
+	var poly := PackedVector2Array([Vector2(edge[0].x, top_y)])
+	poly.append_array(edge)
+	poly.append(Vector2(edge[edge.size() - 1].x, top_y))
+	ci.draw_colored_polygon(poly, dark.darkened(0.25))
+	for i in edge.size():
+		var p := edge[i]
+		var r := 22.0 + float((i * 7) % 5) * 3.0
+		ci.draw_circle(p + Vector2(0, -r * 0.6), r, dark)
+		ci.draw_circle(p + Vector2(-4, -r * 0.85), r * 0.55, leaf.darkened(0.2))
+		if i % 3 == 1:
+			var tip := p + Vector2(sin(t * 1.6 + i) * 3.0, 22.0)
+			ci.draw_line(p + Vector2(0, -4), tip, leaf.darkened(0.35), 3.0, true)
+			ci.draw_circle(tip, 4.0, leaf)
+
+
+static func thorn_bush(ci: CanvasItem, ground: PackedVector2Array, h: float, col: Color, thorn: Color) -> void:
+	# Semak berduri: a low spiky band hugging the ground, with red thorn tips.
+	if ground.size() < 2:
+		return
+	var tops := PackedVector2Array()
+	for i in ground.size():
+		tops.append(ground[i] + Vector2(0, -h * (0.7 if i % 2 == 0 else 1.0)))
+	var poly := tops.duplicate()
+	for i in range(ground.size() - 1, -1, -1):
+		poly.append(ground[i] + Vector2(0, 8))
+	ci.draw_colored_polygon(poly, col)
+	for p in tops:
+		ci.draw_colored_polygon(PackedVector2Array([p + Vector2(-5, 3), p + Vector2(0, -11), p + Vector2(5, 3)]), thorn)
+

@@ -111,3 +111,129 @@ func test_canopy_coins() -> String:
 					return "seed %d canopy x0=%.0f: coin %s off the centre line" % [s, float(c.x0), p]
 		_free(w)
 	return ""
+
+
+# ---------------------------------------------------------------- the Canopy hazard
+
+func _ground_speed(x: float, fever: bool) -> float:
+	var target := lerpf(Bird.SPEED_START, Bird.SPEED_MAX, clampf(x / Bird.SPEED_RAMP_X, 0.0, 1.0))
+	return 0.85 * target * (1.3 if fever else 1.0)
+
+
+## Flies the bird from x0 to past the tunnel's end (or until it dies); `hold` decides holding each step.
+## Returns [deaths, passes].
+func _fly(w: World, c: Dictionary, x0: float, y0: float, ground: bool, speed: float, fever: bool, hold: Callable) -> Array:
+	var deaths: Array = []
+	var passes: Array = []
+	w.bird_died.connect(func(cause: String): deaths.append(cause))
+	w.hazard_passed.connect(func(cause: String): passes.append(cause))
+	var b := w.bird
+	b.position = Vector2(x0, w.terrain.height_at(x0) if ground else y0)
+	b.on_ground = ground
+	b.fever = fever
+	b.vel = Vector2(speed, 0.0)
+	var end_x: float = float(c.x1) + 200.0
+	w.input_enabled = true
+	var t := 0.0
+	while t < 10.0 and deaths.is_empty() and b.position.x < end_x:
+		w._touch_hold = hold.call(b)
+		b.stamina = 1.0
+		w._physics_process(DT)
+		t += DT
+	return [deaths, passes]
+
+
+## Holds toward the corridor's centre line slightly ahead of the bird.
+func _centre(tr: Terrain) -> Callable:
+	return func(b: Bird) -> bool:
+		var ax := b.position.x + b.vel.x * 0.3
+		return b.center().y + b.vel.y * 0.15 > tr.height_at(ax) - Canopy.GAP * 0.5
+
+
+func test_canopy_center_path_passes() -> String:
+	for s in SEEDS:
+		for mode in ["start", "max", "fever"]:
+			var probe := _world(s)
+			var n: int = _on(probe, 0).size()
+			_free(probe)
+			for i in n:
+				var w := _world(s)
+				var c: Dictionary = _on(w, 0)[i]
+				var tr := w.terrain
+				var x0: float = float(c.x0) - 600.0
+				var speed: float = Bird.SPEED_START if mode == "start" else Bird.SPEED_MAX
+				var fever: bool = mode == "fever"
+				if fever:
+					speed = Bird.SPEED_MAX * 1.3
+				var r := _fly(w, c, x0, tr.height_at(x0) - Canopy.GAP * 0.5, false, speed, fever, _centre(tr))
+				_free(w)
+				if not r[0].is_empty():
+					return "seed %d %s canopy %d: died %s" % [s, mode, i, r[0]]
+				if r[1] != ["hutan"]:
+					return "seed %d %s canopy %d: passes %s" % [s, mode, i, r[1]]
+	return ""
+
+
+func test_canopy_ground_run_dies() -> String:
+	for s in SEEDS:
+		var w := _world(s)
+		var c: Dictionary = _on(w, 0)[0]
+		var r := _fly(w, c, float(c.x0) - 400.0, 0.0, true, 500.0, false, func(_b: Bird) -> bool: return false)
+		var at := w.bird.position.x
+		_free(w)
+		if r[0] != ["hutan"]:
+			return "seed %d: deaths=%s" % [s, r[0]]
+		if at > float(c.x0) + 60.0:
+			return "seed %d: died late at x=%.0f" % [s, at]
+	return ""
+
+
+func test_canopy_roof_dies() -> String:
+	for s in SEEDS:
+		var w := _world(s)
+		var c: Dictionary = _on(w, 0)[0]
+		var y := Canopy.roof_y(w.terrain, float(c.x0) + 100.0) - 40.0
+		var r := _fly(w, c, float(c.x0) - 400.0, y + Bird.RADIUS, false, 500.0, false,
+				func(b: Bird) -> bool: return b.center().y > y)
+		_free(w)
+		if r[0] != ["hutan"]:
+			return "seed %d: deaths=%s" % [s, r[0]]
+	return ""
+
+
+func test_canopy_safe_in_menu() -> String:
+	var w := _world(4242, HUTAN, false)
+	w.autoplay = true
+	var cs := _on(w, 0)
+	var end_x: float = float(cs[cs.size() - 1].x1) + 100.0
+	var t := 0.0
+	while t < 120.0 and not w.dead and w.bird.position.x < end_x:
+		w._physics_process(DT)
+		t += DT
+	var at := w.bird.position.x
+	var dead := w.dead
+	_free(w)
+	if dead:
+		return "menu world died"
+	return "" if at >= end_x else "stopped at x=%.0f" % at
+
+
+func test_autopilot_clears_canopies() -> String:
+	for s in [11, 22, 33, 44, 55]:
+		var w := _world(s)
+		w.autoplay = true
+		var deaths: Array = []
+		w.bird_died.connect(func(cause: String): deaths.append(cause))
+		var cs := _on(w, 0)
+		var end_x: float = float(cs[cs.size() - 1].x1) + 100.0
+		var t := 0.0
+		while t < 120.0 and deaths.is_empty() and w.bird.position.x < end_x:
+			w._physics_process(DT)
+			t += DT
+		var at := w.bird.position.x
+		_free(w)
+		if not deaths.is_empty():
+			return "seed %d: died (%s) at x=%.0f" % [s, deaths[0], at]
+		if at < end_x:
+			return "seed %d: only reached x=%.0f" % [s, at]
+	return ""
