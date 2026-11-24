@@ -4,7 +4,22 @@ extends Node
 ## gets `runner` set to this node, returns "" on success or a failure message).
 
 
+## Counts script errors so a test that hits a runtime error fails instead of silently passing.
+class ErrorCounter:
+	extends Logger
+	var count := 0
+	var last := ""
+
+	func _log_error(_function: String, _file: String, _line: int, _code: String, rationale: String, _editor_notify: bool, error_type: int, _script_backtrace: Array[ScriptBacktrace]) -> void:
+		if error_type == ERROR_TYPE_SCRIPT or error_type == ERROR_TYPE_ERROR:
+			count += 1
+			last = rationale if rationale != "" else _code
+
+
 func _ready() -> void:
+	Game.dev["nosave"] = true
+	var errors := ErrorCounter.new()
+	OS.add_logger(errors)
 	var only := ""
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--only="):
@@ -30,7 +45,10 @@ func _ready() -> void:
 				continue
 			var t: Object = script.new()
 			t.set("runner", self)
+			var errors_before := errors.count
 			var res: Variant = t.call(mname)
+			if errors.count > errors_before and res is String and res == "":
+				res = "script error: " + errors.last
 			for c in get_children():
 				remove_child(c)
 				c.free()

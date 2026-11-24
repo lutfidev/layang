@@ -156,6 +156,8 @@ func toggle_music() -> void:
 # ---------------------------------------------------------------- save / load
 
 func save_game() -> void:
+	if dev.has("nosave"):   # tests / balance sims must not touch the player's save
+		return
 	var data := {
 		"coins": coins, "best_score": best_score, "best_distance": best_distance,
 		"best_island": best_island, "total_runs": total_runs,
