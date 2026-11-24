@@ -1,6 +1,6 @@
 # Petualangan (18 level) + Misi — design
 
-Status: disetujui pemilik repo (2026-11-24). Langkah Petualangan selesai (`feat/peta-petualangan`) · lanjutan dari `2026-11-24-rintangan-pulau-design.md`
+Status: disetujui pemilik repo (2026-11-24). Langkah Petualangan selesai (`feat/peta-petualangan`), langkah Misi selesai (`feat/misi`) · lanjutan dari `2026-11-24-rintangan-pulau-design.md`
 
 ## Intent (kenapa)
 
@@ -57,6 +57,8 @@ tumbuh) dicatat sebagai tujuan jangka panjang, dan peta pulau ini nanti bisa men
 
 1. **Petualangan** (plan `2026-11-24-peta-petualangan.md`): level, peta, layar selesai, bintang.
 2. **Misi** (plan `2026-11-24-misi.md`).
+2b. **Perbaikan temuan** (plan `2026-11-24-perbaikan-temuan.md`): semua temuan kecil yang ditunda dari PR #7, #9, dan #10.
+   Atas permintaan pemilik repo, langkah ini dikerjakan sebelum semburan lava.
 3. Semburan lava, yang juga membuka level Gunung (`2026-11-24-semburan-lava.md`).
 4. Kawanan kelelawar, yang juga membuka level Danau (`2026-11-24-kelelawar-danau.md`).
 5. Gerbang awan petir, yang juga membuka level Awan (`2026-11-24-awan-petir.md`).
@@ -170,6 +172,19 @@ tumbuh) dicatat sebagai tujuan jangka panjang, dan peta pulau ini nanti bisa men
   tidak pernah bisa diambil (juga di Tanpa Batas).
 - Peta tidak memakai gambar gembok atau pita: level terkunci berwarna abu-abu dan nonaktif, dan pulau belum siap diberi
   label "Segera hadir".
+
+## Angka akhir (langkah Misi)
+
+- Urutan templat (17): skim 10, koin 150, lolos 5, layangan 3, bintang 3, ombak 3, skim 25, level bersih 1, koin 400,
+  pulau ke-3, lorong hutan 2, lolos 15, bintang 9, skim 50, level bersih 3, koin 1000, pulau ke-5. Setelah yang terakhir,
+  urutan berputar dari awal. Tiga misi awal: skim 10, koin 150, lolos 5.
+- Misi koin menghitung koin yang diambil (2 per koin saat FEVER), bukan bonus pulau.
+- Layangan yang dilewati dihitung untuk misi (`pass` dan `pass_layangan`) tanpa popup atau poin, karena layangan muncul
+  sering. Lompatan respawn melewati layangan setelah Lanjut tidak dihitung.
+- Keluar lewat jeda, baik "Ulang" maupun "Menu Utama", tetap membayar misi yang selesai.
+- Panel Misi ada di samping panel hasil, panel selesai, dan panel jeda (bukan di dalamnya), supaya tombol tidak terdorong
+  keluar layar. Layar hasil menampilkan 3 misi run itu; misi pengganti terlihat di menu dan jeda.
+- Burung di menu digeser ke `bird_screen_x = 0.56`, supaya terbang di antara tombol dan panel Misi.
 
 ## Diserahkan ke pembuat
 

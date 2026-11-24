@@ -102,6 +102,9 @@ func _ready() -> void:
 	kite = Kite.new()
 	kite.terrain = terrain
 	add_child(kite)
+	kite.passed.connect(func():
+		if hazards and not dead:
+			hazard_passed.emit("layangan"))
 	canopy = Canopy.new()
 	_add_island_hazard(canopy)
 	wave.passed.connect(func():
@@ -285,6 +288,7 @@ func _die(cause: String) -> void:
 func clear_hazards() -> void:
 	monster.reset()
 	wave.reset_current()
+	kite.reset_current()
 	for h in _island_hazards:
 		h.reset_current()
 	_jumps_left = 0

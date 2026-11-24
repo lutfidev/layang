@@ -125,3 +125,69 @@ class CoinIcon:
 	func _draw() -> void:
 		Art.coin(self, size * 0.5, size.x * 0.42, Time.get_ticks_msec() / 1000.0 * 0.3)
 
+
+
+## One mission line: text, `progress/target` (or "Selesai! +N" in green once paid) and a thin progress bar.
+static func mission_row(m: Dictionary, progress: int, done_reward: int = 0) -> Control:
+	var target := int(m.target)
+	var done := progress >= target
+	var p := PanelContainer.new()
+	var s := box(Color(0.24, 0.62, 0.36, 0.85) if done else Color(1, 1, 1, 0.08), 16)
+	s.content_margin_left = 14
+	s.content_margin_right = 14
+	s.content_margin_top = 8
+	s.content_margin_bottom = 10
+	p.add_theme_stylebox_override("panel", s)
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	p.add_child(v)
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 10)
+	v.add_child(h)
+	var t := label(Missions.label(m), 21, Color.WHITE, true)
+	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	h.add_child(t)
+	var right := "Selesai! +%d" % done_reward if done_reward > 0 else ("Selesai!" if done else "%d/%d" % [progress, target])
+	var r := label(right, 21, Color("#ffe066") if done else Color(1, 1, 1, 0.8), true)
+	r.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(r)
+	var bar := ProgressBar.new()
+	bar.show_percentage = false
+	bar.custom_minimum_size = Vector2(0, 8)
+	bar.max_value = target
+	bar.value = mini(progress, target)
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0, 0, 0, 0.3)
+	bg.set_corner_radius_all(4)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = Color("#ffe066") if done else LEAF
+	fill.set_corner_radius_all(4)
+	bar.add_theme_stylebox_override("background", bg)
+	bar.add_theme_stylebox_override("fill", fill)
+	v.add_child(bar)
+	return p
+
+
+## "Misi" panel with one row per entry `[mission template, progress, paid reward]`.
+static func missions_panel(entries: Array, width: float = 420.0) -> PanelContainer:
+	var p := panel(Color(0.12, 0.08, 0.24, 0.88), 28)
+	p.custom_minimum_size = Vector2(width, 0)
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 10)
+	p.add_child(v)
+	v.add_child(label("Misi", 30, Color("#ffd8a8"), true))
+	for e in entries:
+		v.add_child(mission_row(e[0], int(e[1]), int(e[2])))
+	return p
+
+
+## Entries for `missions_panel` from the active missions (nothing paid yet).
+static func active_mission_entries() -> Array:
+	var out: Array = []
+	for a in Game.missions:
+		out.append([Missions.get_mission(a.id), int(a.progress), 0])
+	return out

@@ -23,6 +23,9 @@ var tutorial_done: bool = false
 var last_daily: String = ""
 var daily_streak: int = 0
 var level_stars: Dictionary = {}   # adventure level id -> best stars (0..3)
+var missions: Array = []           # 3 active missions: {id, progress} (templates in Missions)
+var mission_seq: int = 0           # index of the next template to offer
+var save_count := 0                # save requests so far (lets tests see that a save happened under --nosave)
 ## Adventure level being played ("" = endless run). Set by the level map or `--level=<id>`.
 var current_level: String = ""
 
@@ -41,6 +44,7 @@ func _ready() -> void:
 		current_level = str(dev["level"])
 	_setup_input()
 	load_game()
+	ensure_missions()
 	_build_fade()
 	if dev.has("shot"):
 		_schedule_screenshot()
@@ -141,6 +145,58 @@ func last_unlocked_index() -> int:
 	return last
 
 
+# ---------------------------------------------------------------- missions
+
+## Adds progress to every active mission of this kind (summed across runs).
+func mission_event(kind: String, amount: int = 1) -> void:
+	for a in missions:
+		if Missions.get_mission(a.id).kind == kind:
+			a.progress = int(a.progress) + amount
+
+
+## Raises progress to `value` for missions measured as a best value (endless_island).
+func mission_max(kind: String, value: int) -> void:
+	for a in missions:
+		if Missions.get_mission(a.id).kind == kind:
+			a.progress = maxi(int(a.progress), value)
+
+
+func mission_done(a: Dictionary) -> bool:
+	return int(a.progress) >= int(Missions.get_mission(a.id).target)
+
+
+## Pays every finished mission, replaces it and returns `[{id, reward}]`. Called once at the end of a run.
+func settle_missions() -> Array:
+	var done: Array = []
+	var total := 0
+	for a in missions:
+		if mission_done(a):
+			var r := int(Missions.get_mission(a.id).reward)
+			done.append({"id": a.id, "reward": r})
+			total += r
+	if done.is_empty():
+		save_game()   # keep the run's progress even when nothing finished
+		return done
+	missions = missions.filter(func(a: Dictionary) -> bool: return not mission_done(a))
+	ensure_missions()
+	add_coins(total)   # also saves
+	return done
+
+
+## Fills the active list up to 3 with the next templates whose kind is not active and whose island is ready.
+func ensure_missions() -> void:
+	var all := Missions.all()
+	var tries := 0
+	while missions.size() < 3 and tries < all.size():
+		var m: Dictionary = all[mission_seq % all.size()]
+		mission_seq = (mission_seq + 1) % all.size()
+		tries += 1
+		var kinds := missions.map(func(a: Dictionary) -> String: return Missions.get_mission(a.id).kind)
+		if Missions.available(m) and not kinds.has(m.kind):
+			missions.append({"id": m.id, "progress": 0})
+			tries = 0
+
+
 # ---------------------------------------------------------------- daily reward
 
 func _today() -> String:
@@ -196,6 +252,7 @@ func toggle_music() -> void:
 # ---------------------------------------------------------------- save / load
 
 func save_game() -> void:
+	save_count += 1
 	if dev.has("nosave"):   # tests / balance sims must not touch the player's save
 		return
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
@@ -211,6 +268,7 @@ func save_data() -> Dictionary:
 		"sound_on": sound_on, "music_on": music_on, "ads_removed": ads_removed,
 		"tutorial_done": tutorial_done, "last_daily": last_daily, "daily_streak": daily_streak,
 		"level_stars": level_stars,
+		"missions": missions.duplicate(true), "mission_seq": mission_seq,
 	}
 
 
@@ -248,6 +306,17 @@ func apply_save(parsed: Dictionary) -> void:
 	if typeof(ls) == TYPE_DICTIONARY:
 		for k in ls:
 			level_stars[str(k)] = int(ls[k])
+	missions = []
+	var ms = parsed.get("missions", [])
+	if typeof(ms) == TYPE_ARRAY:
+		for a in ms:
+			if typeof(a) == TYPE_DICTIONARY and not Missions.get_mission(str(a.get("id", ""))).is_empty():
+				var m := Missions.get_mission(str(a.id))
+				var kinds := missions.map(func(b: Dictionary) -> String: return Missions.get_mission(b.id).kind)
+				if Missions.available(m) and not kinds.has(m.kind) and missions.size() < 3:
+					missions.append({"id": str(a.id), "progress": int(a.get("progress", 0))})
+	mission_seq = int(parsed.get("mission_seq", 0))
+	ensure_missions()
 	if dev.has("coins"):
 		coins = int(dev["coins"])
 

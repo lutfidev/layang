@@ -42,6 +42,8 @@ var end_cause := ""         # laut | monster | ombak | layangan (batas = sim cap
 var _high_awarded := false
 var fever_t := 0.0
 var continued := false
+var missions_done: Array = []   # missions paid at the end of this run: [{id, reward}]
+var missions_run: Array = []    # the active missions as they were when the run ended (shown on the results)
 var coin_chain := 0
 var coin_chain_t := 0.0
 var start_x := 0.0
@@ -172,6 +174,7 @@ func _finish(cause: String) -> void:
 	var earned := coins_run - coins_banked
 	coins_banked = coins_run
 	Game.add_coins(earned)
+	_settle_missions()
 	var record := false
 	if level.is_empty():
 		record = Game.submit_run(score(), distance, world.current_island + 1)
@@ -201,6 +204,10 @@ func _finish_level() -> void:
 	var earned := coins_run - coins_banked
 	coins_banked = coins_run
 	Game.add_coins(earned + bonus)
+	Game.mission_event("stars", new_stars)
+	if not continued:
+		Game.mission_event("level_clean")
+	_settle_missions()
 	lbl_hint.hide()
 	if Game.dev.has("autoplay"):
 		print("RUN level=%s stars=%d coins=%d/%d run_coins=%d dist=%d cause=selesai" % [level.id, stars, level_coins, level_coins_total, coins_run, distance])
@@ -235,6 +242,7 @@ func _continue_run() -> void:
 func _on_island(k: int, biome: Dictionary) -> void:
 	if not level.is_empty():
 		return   # a level ends at its gate: no island bonus, no banner
+	Game.mission_max("endless_island", k + 1)
 	style_points += 500
 	coins_run += 20
 	Sfx.play("island")
@@ -247,7 +255,9 @@ func _on_island(k: int, biome: Dictionary) -> void:
 func _on_item(_kind: int, pos: Vector2) -> void:
 	if not level.is_empty() and pos.x < world.terrain.island_finish[0]:
 		level_coins += 1
-	coins_run += 2 if world.bird.fever else 1
+	var gained := 2 if world.bird.fever else 1
+	coins_run += gained
+	Game.mission_event("coins", gained)
 	coin_chain += 1
 	coin_chain_t = 0.6
 	Sfx.play("coin", 1.0 + 0.045 * mini(coin_chain, 14))
@@ -268,6 +278,7 @@ func _on_skimmed(_duration: float) -> void:
 		return
 	skim_streak += 1
 	best_skim = maxi(best_skim, skim_streak)
+	Game.mission_event("skim")
 	style_points += 25 * skim_streak
 	Sfx.play("perfect", 1.0 + 0.06 * mini(skim_streak, 8))
 	var b := world.bird
@@ -290,6 +301,8 @@ func _on_skimmed(_duration: float) -> void:
 func _on_wave_passed() -> void:
 	if state != "play":
 		return
+	Game.mission_event("pass")
+	Game.mission_event("pass_ombak")
 	style_points += WAVE_POINTS
 	Sfx.play("perfect", 1.2)
 	_popup("LOLOS OMBAK!", "+%d" % WAVE_POINTS, Color("#7ff0e6"))
@@ -302,8 +315,12 @@ func _on_hazard_spotted(cause: String) -> void:
 
 
 func _on_hazard_passed(cause: String) -> void:
-	if state != "play" or not HAZARD_PASS.has(cause):
+	if state != "play":
 		return
+	Game.mission_event("pass")
+	Game.mission_event("pass_" + cause)
+	if not HAZARD_PASS.has(cause):
+		return   # kites count for missions but have no popup
 	var p: Array = HAZARD_PASS[cause]
 	style_points += int(p[1])
 	Sfx.play("perfect", 1.2)
@@ -520,7 +537,13 @@ func _toggle_pause() -> void:
 	get_tree().paused = true
 	pause_panel = _overlay()
 	var p := UIKit.panel()
-	_center(pause_panel, p)
+	var side := HBoxContainer.new()
+	side.add_theme_constant_override("separation", 20)
+	side.add_child(p)
+	var mp := UIKit.missions_panel(UIKit.active_mission_entries(), 400.0)
+	mp.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	side.add_child(mp)
+	_center(pause_panel, side)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 16)
 	p.add_child(v)
@@ -531,7 +554,7 @@ func _toggle_pause() -> void:
 	b1.pressed.connect(_toggle_pause)
 	v.add_child(b1)
 	var b2 := UIKit.button("Ulang", UIKit.SUN, UIKit.SUN_DARK, 28, 320)
-	b2.pressed.connect(func(): Game.goto("res://scenes/game.tscn"))
+	b2.pressed.connect(func(): _leave_run("res://scenes/game.tscn"))
 	v.add_child(b2)
 	var hb := HBoxContainer.new()
 	hb.add_theme_constant_override("separation", 12)
@@ -545,8 +568,43 @@ func _toggle_pause() -> void:
 	mus.pressed.connect(func(): Game.toggle_music(); mus.text = _onoff("Musik", Game.music_on))
 	hb.add_child(mus)
 	var b3 := UIKit.button("Menu Utama", UIKit.PLUM, UIKit.PLUM_DARK, 26, 320)
-	b3.pressed.connect(func(): Game.goto("res://scenes/main_menu.tscn"))
+	b3.pressed.connect(func(): _leave_run("res://scenes/main_menu.tscn"))
 	v.add_child(b3)
+
+
+## Leaving mid-run from the pause panel still pays finished missions.
+func _leave_run(path: String) -> void:
+	_settle_missions()
+	Game.goto(path)
+
+
+func _settle_missions() -> void:
+	missions_run = Game.missions.duplicate(true)
+	missions_done = Game.settle_missions()
+
+
+## The run's missions for the results panel, with the reward of the ones just paid.
+func _run_mission_entries() -> Array:
+	var out: Array = []
+	for a in missions_run:
+		var paid := 0
+		for d in missions_done:
+			if d.id == a.id:
+				paid = int(d.reward)
+		out.append([Missions.get_mission(a.id), int(a.progress), paid])
+	return out
+
+
+## Puts the results panel and the run's missions side by side in the centre of the overlay.
+func _center_with_missions(parent: Control, p: Control) -> void:
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 20)
+	hb.alignment = BoxContainer.ALIGNMENT_CENTER
+	hb.add_child(p)
+	var mp := UIKit.missions_panel(_run_mission_entries(), 400.0)
+	mp.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	hb.add_child(mp)
+	_center(parent, hb)
 
 
 static func _onoff(name: String, on: bool) -> String:
@@ -577,7 +635,7 @@ func _show_results(record: bool) -> void:
 	create_tween().tween_property(result_panel, "modulate:a", 1.0, 0.4)
 	var p := UIKit.panel(Color(0.12, 0.08, 0.24, 0.9), 34)
 	p.custom_minimum_size = Vector2(620, 0)
-	_center(result_panel, p)
+	_center_with_missions(result_panel, p)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	p.add_child(v)
@@ -661,7 +719,7 @@ func _show_level_done(stars: int, new_stars: int, earned: int, bonus: int) -> vo
 	fade.tween_property(result_panel, "modulate:a", 1.0, 0.4)
 	var p := UIKit.panel(Color(0.12, 0.08, 0.24, 0.9), 34)
 	p.custom_minimum_size = Vector2(620, 0)
-	_center(result_panel, p)
+	_center_with_missions(result_panel, p)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	p.add_child(v)

@@ -22,6 +22,7 @@ const COLORS := [
 ]
 
 signal spotted
+signal passed   # the bird got past a kite without hitting it (once per kite)
 
 var terrain: Terrain
 var view_left := 0.0
@@ -30,6 +31,8 @@ var hit_color := Color.WHITE
 var _anim := 0.0
 var _spotted := false
 var _first := 0
+var _passed_upto := 0          # kites before this index are already counted as passed
+var _skip_passes := false      # set by reset_current: the respawn jump past a kite is not a pass
 
 
 func _ready() -> void:
@@ -94,7 +97,17 @@ func update(delta: float, bird_center: Vector2, bird_x: float) -> bool:
 		if bird_center.x <= sp.y and hits(k, _anim, bird_center):
 			hit_color = COLORS[int(k.color)][0]
 			return true
+	while _passed_upto < kites.size() and span(kites[_passed_upto]).y < bird_center.x:
+		_passed_upto += 1
+		if not _skip_passes:
+			passed.emit()
+	_skip_passes = false
 	return false
+
+
+## After "Lanjut": kites the bird is moved past are not counted as passed.
+func reset_current() -> void:
+	_skip_passes = true
 
 
 ## Moves x forward past any kite it is inside of or less than 200 px before (respawn after "Lanjut").
