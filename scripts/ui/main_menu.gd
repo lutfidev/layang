@@ -54,7 +54,7 @@ func _build_ui() -> void:
 	logo.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.35))
 	logo.add_theme_constant_override("shadow_offset_y", 8)
 	col.add_child(logo)
-	var tag := UIKit.label("Terbang melintasi Nusantara sebelum senja", 28, Color.WHITE, false, 8)
+	var tag := UIKit.label("Terbang tanpa batas melintasi Nusantara", 28, Color.WHITE, false, 8)
 	col.add_child(tag)
 	var gap := Control.new()
 	gap.custom_minimum_size = Vector2(0, 18)

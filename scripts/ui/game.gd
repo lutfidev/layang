@@ -100,6 +100,9 @@ func _physics_process(delta: float) -> void:
 		if Game.dev.has("sim") and run_time >= float(Game.dev.get("sim-max", SIM_MAX)):
 			_finish("batas")
 			return
+		if Game.dev.has("die") and run_time >= 2.0:   # dev: show the lose screen for this cause
+			_finish(str(Game.dev["die"]))
+			return
 		if fever_t > 0.0:
 			fever_t -= delta
 			if fever_t <= 0.0:
