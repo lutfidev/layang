@@ -47,6 +47,7 @@ var skin: Dictionary = {}
 var _flap := 0.0
 var _squash := Vector2.ONE
 var _was_underwater := false
+var _kick_flight := false          # airborne after a lip kick: the landing is always soft
 var _trail: Line2D
 var _glow: Node2D
 
@@ -166,6 +167,7 @@ func step(delta: float) -> void:
 		air_time = 0.0
 		max_air_height = 0.0
 		vel.y = -LIP_KICK
+		_kick_flight = true
 		position.y -= GROUND_STICK + 1.0
 		kicked.emit()
 
@@ -176,7 +178,8 @@ func step(delta: float) -> void:
 
 
 func _land(slope: float) -> void:
-	var bonk := (vel.y > BONK_FALL_SPEED or slope < BONK_SLOPE) and not terrain.soft_landing_at(position.x)
+	var bonk := (vel.y > BONK_FALL_SPEED or slope < BONK_SLOPE) and not terrain.soft_landing_at(position.x) and not _kick_flight
+	_kick_flight = false
 	if bonk:
 		vel.x *= 0.6
 	_squash = Vector2(1.3, 0.72) if bonk else Vector2(1.12, 0.88)

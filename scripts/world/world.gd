@@ -85,6 +85,7 @@ func _ready() -> void:
 	add_child(monster)
 	wave = Wave.new()
 	wave.terrain = terrain
+	wave.sounds = hazards
 	add_child(wave)
 	wave.passed.connect(func():
 		if not dead:
@@ -106,7 +107,9 @@ func _ready() -> void:
 	bird.landed.connect(_on_landed)
 	bird.splashed.connect(_on_splash)
 	bird.skimmed.connect(func(d: float): bird_skimmed.emit(d))
-	bird.kicked.connect(func(): Sfx.play("whoosh", 1.3))
+	bird.kicked.connect(func():
+		if hazards:
+			Sfx.play("whoosh", 1.3))
 
 	_biome_to = Biomes.get_biome(start_island)
 	_biome_from = _biome_to

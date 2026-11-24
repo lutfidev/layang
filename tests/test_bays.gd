@@ -372,3 +372,85 @@ func test_autopilot_clears_bays() -> String:
 		if passes[0] != Terrain.BAYS_PER_ISLAND:
 			return "seed %d: passes=%d (t=%.1f)" % [s, passes[0], t]
 	return ""
+
+
+# ---------------------------------------------------------------- final review fixes
+
+func test_continue_far_from_bay_keeps_next_wave() -> String:
+	var w := _world(4242, 1)
+	for i in 30:
+		w._physics_process(DT)   # wave picks up bay 0 while still far away
+	w.clear_hazards()            # e.g. "Lanjut" after a death nowhere near a bay
+	var rose := [false]
+	var setup := func(b: Bird, bay: Dictionary) -> void:
+		var x: float = bay.lip_x - 900.0
+		b.position = Vector2(x, w.terrain.height_at(x) - 300.0)
+		b.on_ground = false
+		b.vel = Vector2(_ground_speed(x, false), 0.0)
+	var bay: Dictionary = w.terrain.bays[0]
+	setup.call(w.bird, bay)
+	var passes := [0]
+	w.wave_passed.connect(func(): passes[0] += 1)
+	var t := 0.0
+	while t < 6.0 and w.bird.position.x < bay.bank_x:
+		w.bird.position.y = minf(w.bird.position.y, Terrain.WATER_Y - Wave.WAVE_H - 250.0)
+		w._physics_process(DT)
+		t += DT
+		rose[0] = rose[0] or (w.wave.state == "rise" and w.wave.bay == 0)
+	if not rose[0]:
+		return "bay 0 wave never rose after a far-away continue (bay=%d)" % w.wave.bay
+	return "" if passes[0] == 1 else "passes=%d" % passes[0]
+
+
+func test_kick_landing_never_bonks() -> String:
+	for s in CROSS_SEEDS:
+		for first in [1, 0]:
+			for fever in [false, true]:
+				for i in Terrain.BAYS_PER_ISLAND:
+					var w := _world(s, first)
+					var bay: Dictionary = w.terrain.bays[i]
+					var x: float = bay.lip_x - 200.0
+					var b := w.bird
+					b.position = Vector2(x, w.terrain.height_at(x))
+					b.on_ground = true
+					b.fever = fever
+					b.vel = Vector2(_ground_speed(x, fever), 0.0)
+					var landings: Array = []
+					var kicked := [false]
+					b.kicked.connect(func(): kicked[0] = true)
+					b.landed.connect(func(bonk: bool):
+						if kicked[0]:
+							landings.append(bonk))
+					var t := 0.0
+					while t < 5.0 and not w.dead and landings.is_empty():
+						w._physics_process(DT)
+						t += DT
+					_free(w)
+					if landings != [false]:
+						return "seed %d start %d fever %s bay %d: landings=%s" % [s, first, fever, i, landings]
+	return ""
+
+
+func test_menu_world_is_silent() -> String:
+	var was_on := Game.sound_on
+	Game.sound_on = true
+	var res := _menu_silence()
+	Game.sound_on = was_on
+	return res
+
+
+func _menu_silence() -> String:
+	var w := _world(4242, 1, false)
+	var bay: Dictionary = w.terrain.bays[0]
+	var x: float = bay.mid - 2200.0
+	w.bird.position = Vector2(x, w.terrain.height_at(x))
+	w.bird.on_ground = true
+	w.bird.vel = Vector2(_ground_speed(x, false), 0.0)
+	var before: int = Sfx._next
+	var t := 0.0
+	while t < 8.0 and w.bird.position.x < bay.bank_x:
+		w._physics_process(DT)
+		t += DT
+	if w.wave.state == "idle" and w.bird.position.x < bay.mid:
+		return "never reached the bay (test vacuous)"
+	return "" if Sfx._next == before else "menu world played %d sounds" % posmod(Sfx._next - before, 8)

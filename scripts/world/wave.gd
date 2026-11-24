@@ -16,6 +16,7 @@ const RECEDE_TIME := 0.9
 signal passed
 
 var terrain: Terrain
+var sounds := true             # false in menu / shop demo worlds
 var bay := -1
 var state := "idle"            # idle | foam | rise | recede
 var height := 0.0
@@ -58,12 +59,12 @@ func update(delta: float, bird_center: Vector2, bird_x: float) -> bool:
 		height = 0.0
 		return false
 	if _d > RISE_DIST:
-		if state == "idle":
+		if state == "idle" and sounds:
 			Sfx.play("fizz")
 		state = "foam"
 		height = 0.0
 		return false
-	if state != "rise":
+	if state != "rise" and sounds:
 		Sfx.play("surge")
 	state = "rise"
 	height = WAVE_H * ease(clampf((RISE_DIST - _d) / (RISE_DIST - FULL_DIST), 0.0, 1.0), -2.0)
@@ -71,8 +72,9 @@ func update(delta: float, bird_center: Vector2, bird_x: float) -> bool:
 
 
 ## Lets the current bay's wave go without counting it as passed (used by "Lanjut terbang").
+## Only an active wave (foam or rising) is skipped; a bay still far ahead keeps its wave.
 func reset_current() -> void:
-	if bay >= 0:
+	if bay >= 0 and state in ["foam", "rise"]:
 		_finish(false)
 
 
