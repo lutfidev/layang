@@ -9,6 +9,8 @@ signal bird_landed(bonk: bool)
 signal bird_splashed
 signal bird_died(cause: String)        # "laut" | "monster" | "ombak" | "layangan"
 signal wave_passed
+signal hazard_spotted(cause: String)   # an island hazard (Canopy, ...) seen for the first time this run
+signal hazard_passed(cause: String)
 signal bird_skimmed(duration: float)
 
 var autoplay := false
@@ -32,6 +34,8 @@ var dead := false
 var monster: SeaMonster
 var wave: Wave
 var kite: Kite
+var canopy: Canopy
+var _island_hazards: Array[Node2D] = []   # per-island hazards sharing update/safe_x_after/reset_current/CAUSE
 
 var _sky_mat: ShaderMaterial
 var _sky_rect: ColorRect
@@ -91,6 +95,8 @@ func _ready() -> void:
 	kite = Kite.new()
 	kite.terrain = terrain
 	add_child(kite)
+	canopy = Canopy.new()
+	_add_island_hazard(canopy)
 	wave.passed.connect(func():
 		if not dead:
 			wave_passed.emit())
@@ -119,6 +125,37 @@ func _ready() -> void:
 	ambient.set_biome(_biome_to)
 	_update_camera(1.0, true)
 	_update_sky()
+
+
+func _add_island_hazard(h: Node2D) -> void:
+	h.terrain = terrain
+	add_child(h)
+	_island_hazards.append(h)
+	var cause: String = h.CAUSE
+	h.spotted.connect(func():
+		if hazards and not dead:
+			hazard_spotted.emit(cause))
+	h.passed.connect(func():
+		if hazards and not dead:
+			hazard_passed.emit(cause))
+
+
+## Moves x forward until it is clear of every hazard and on gentle dry ground (respawn after "Lanjut").
+func safe_x_after(x: float) -> float:
+	# dry_ground_after always steps 120 px forward, so it runs once; hazard pushes land on dry ground
+	x = _past_island_hazards(wave.safe_x_after(x))
+	return _past_island_hazards(kite.safe_x_after(terrain.dry_ground_after(x)))
+
+
+func _past_island_hazards(x: float) -> float:
+	for _i in 8:
+		var nx := kite.safe_x_after(x)
+		for h in _island_hazards:
+			nx = h.safe_x_after(nx)
+		if absf(nx - x) < 0.5:
+			break
+		x = nx
+	return x
 
 
 func current_biome() -> Dictionary:
@@ -165,6 +202,10 @@ func _update_hazards(delta: float) -> void:
 	var x := bird.position.x
 	var hit_wave := wave.update(delta, bird.center(), x)
 	var hit_kite := kite.update(delta, bird.center(), x)
+	var hit_island := ""
+	for h in _island_hazards:
+		if h.update(delta, bird.center(), x, bird.on_ground) and hit_island == "":
+			hit_island = h.CAUSE
 	var over_water := terrain.is_water_at(x)
 	var over_sea := terrain.is_sea_at(x)
 	if not hazards:
@@ -195,6 +236,8 @@ func _update_hazards(delta: float) -> void:
 		_die("ombak")
 	elif hit_kite:
 		_die("layangan")
+	elif hit_island != "":
+		_die(hit_island)
 	elif over_water and bird.center().y > Terrain.WATER_Y:
 		_die("laut")
 
@@ -213,6 +256,10 @@ func _die(cause: String) -> void:
 		shake = 0.8
 		Sfx.play("bonk")
 		Ambient.burst(self, bird.center(), kite.hit_color, 26, 520.0)
+	elif cause == "hutan":
+		shake = 0.8
+		Sfx.play("bonk")
+		Ambient.burst(self, bird.center(), (_biome_to.hill_top as Color), 26, 480.0)
 	bird_died.emit(cause)
 
 
@@ -220,6 +267,8 @@ func _die(cause: String) -> void:
 func clear_hazards() -> void:
 	monster.reset()
 	wave.reset_current()
+	for h in _island_hazards:
+		h.reset_current()
 	_jumps_left = 0
 	_jump_cd = 0.0
 
@@ -249,6 +298,12 @@ func _ai_hold() -> bool:
 		for i in range(1, 7):
 			top = minf(top, terrain.height_at(x + vx * 0.12 * i))
 		target = minf(top, Terrain.WATER_Y) - 70.0
+		var i_can := terrain.canopy_at(x + 500.0)
+		if i_can < 0:
+			i_can = terrain.canopy_at(x)
+		if i_can >= 0:
+			# hutan tunnel: hold the corridor's centre line, a little ahead
+			target = terrain.height_at(x + vx * 0.35) - Canopy.GAP * 0.5 + Bird.RADIUS
 		var i_bay := terrain.next_bay(x)
 		if i_bay >= 0:
 			var bay: Dictionary = terrain.bays[i_bay]
@@ -280,6 +335,9 @@ func _process(delta: float) -> void:
 	coins.view_right = camera.position.x + _view_half().x
 	kite.view_left = coins.view_left
 	kite.view_right = coins.view_right
+	for h in _island_hazards:
+		h.view_left = coins.view_left
+		h.view_right = coins.view_right
 
 
 func _view_half() -> Vector2:

@@ -1,6 +1,6 @@
 # Lorong Kanopi Hutan (Rintangan Pulau, langkah 1) Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Di pulau Hutan Hujan ada 2 lorong kanopi per pulau: atap dahan dan semak berduri mematikan, jalur tengah aman
 dan berisi koin. Sekalian, `World` mendapat daftar `_island_hazards` yang dipakai juga oleh langkah 2–4.
@@ -16,7 +16,11 @@ semua rintangan saat Lanjut.
 
 ## Status
 
-- Belum dimulai.
+- **Selesai** di branch `feat/lorong-kanopi` (Task 1–4, 77 tes hijau).
+- Bukit lorong dibuat landai (lembah 40, puncak −40) dan bukit terakhir pulau tidak dipilih. Lereng acak terlalu curam
+  untuk lorong 300 px pada kecepatan fever.
+- Pohon "pintu" di mulut lorong tidak dipakai karena menutup lorong secara visual.
+- `hazard_passed` hanya untuk lorong yang benar-benar dimasuki burung.
 
 ## Global Constraints
 - Tidak ada aset baru. Atap, pohon pintu, sulur, dan semak berduri digambar sebagai `Art.*`.
@@ -48,19 +52,19 @@ semua rintangan saat Lanjut.
   `var canopies: Array` terurut x, tiap item `{x0: float, x1: float, island: int}`. `x0` = lembah sebelum puncak,
   `x1` = lembah sesudahnya (key point lembah bukit berikutnya). RNG `run_seed * 5381 + k * 77003` → `pick_hills(hills, 2, rng)`.
 
-- [ ] **Step 1: Tes gagal:**
+- [x] **Step 1: Tes gagal:**
   - `test_canopies_only_on_hutan`: seed 4242/7/99, start 2 → pulau 0 (hutan) punya tepat 2 lorong, pulau 1–5 tidak punya; start 0 → lorong hanya di pulau `k` dengan biome `hutan`.
   - `test_canopy_spans_one_hill`: tiap lorong `x1 − x0` di [800, 1600] dan ada tepat satu puncak lokal di antaranya.
   - `test_canopy_not_first_hills`: `x0` > key puncak bukit ke-2 di pulau itu.
   - `test_canopy_coins`: tiap lorong punya tepat 8 koin dengan `x0 < x < x1`, masing-masing `|y − (height_at(x) − GAP/2)| ≤ 30`. Tidak ada koin lain di [x0, x1].
-- [ ] **Step 2:** `godot --headless --path . --import` lalu `godot --headless --path . res://tests/run_tests.tscn -- --only=canopy` → FAIL (`canopies` belum ada).
-- [ ] **Step 3: Implementasi.** Pola sama dengan `kite_hills`. Untuk bukit terpilih, `x0` = key lembah bukit itu dan
+- [x] **Step 2:** `godot --headless --path . --import` lalu `godot --headless --path . res://tests/run_tests.tscn -- --only=canopy` → FAIL (`canopies` belum ada).
+- [x] **Step 3: Implementasi.** Pola sama dengan `kite_hills`. Untuk bukit terpilih, `x0` = key lembah bukit itu dan
   `x1` diisi saat key lembah bukit berikutnya dibuat (atau key landasan peluncur kalau bukit terakhir). `_place_items`
   tetap memanggil `rng.randf()` untuk segmen di dalam lorong supaya urutan RNG sama, tapi koin acak tidak ditaruh.
   8 koin rata di `x0 + 0.1..0.9·(x1−x0)` dengan `y = height_at(x) − Canopy.GAP * 0.5`. `Canopy.GAP` dipakai sebagai
   konstanta, jadi buat `canopy.gd` minimal dengan `const GAP := 300.0` di task ini.
-- [ ] **Step 4:** `--only=canopy` PASS dan seluruh tes `failed=0`.
-- [ ] **Step 5: Commit** `feat(world): pick hutan canopy hills and their guide coins`
+- [x] **Step 4:** `--only=canopy` PASS dan seluruh tes `failed=0`.
+- [x] **Step 5: Commit** `feat(world): pick hutan canopy hills and their guide coins`
 
 ### Task 2: Node `Canopy` + daftar `_island_hazards` di World
 
@@ -85,7 +89,7 @@ semua rintangan saat Lanjut.
     `func safe_x_after(x: float) -> float` di World (rantai `wave`, `kite`, semua `_island_hazards`, `dry_ground_after`,
     diulang sampai x tetap)
 
-- [ ] **Step 1: Tes gagal:**
+- [x] **Step 1: Tes gagal:**
   - `test_canopy_center_path_passes`: tiap lorong pada seed 4242/7/99, burung dimulai 600 px sebelum `x0` dengan input
     "tahan" yang mengejar `height_at − GAP/2` (pengendali sederhana di tes, lewat `_touch_hold` seperti `test_kites`) pada
     kecepatan `SPEED_START`, `SPEED_MAX`, dan fever → tidak mati, dan `hazard_passed("hutan")` terpancar sekali.
@@ -93,16 +97,16 @@ semua rintangan saat Lanjut.
   - `test_canopy_roof_dies`: burung terbang rata di `roof_y(x0 + 100) − 40` → `bird_died("hutan")`.
   - `test_canopy_safe_in_menu`: `hazards = false` dan autopilot melewati 2 pulau Hutan → tidak pernah `dead`.
   - `test_autopilot_clears_canopies`: `hazards = true` dan autopilot di start island 2 sampai pulau 1 → tidak mati.
-- [ ] **Step 2:** `--only=canopy` → FAIL.
-- [ ] **Step 3: Implementasi `Canopy`** meniru `Kite` (indeks `_first`, `spotted` sekali, gambar hanya `view_left..view_right`).
+- [x] **Step 2:** `--only=canopy` → FAIL.
+- [x] **Step 3: Implementasi `Canopy`** meniru `Kite` (indeks `_first`, `spotted` sekali, gambar hanya `view_left..view_right`).
   Atap: polygon dari `roof_y` ke `CEILING_HARD − 400`, ditambah sulur yang menjuntai (hiasan, di atas `roof_y`, tidak
   mematikan). `passed` dipancarkan saat `bird_x > x1 + 40`. Di `World._ready`: buat `Canopy`, masukkan ke
   `_island_hazards`, sambungkan `spotted/passed` ke `hazard_spotted/hazard_passed` (hanya saat `hazards`).
   `_update_hazards` memanggil `update` untuk semua item lalu `_die(h.CAUSE)`. `_die("hutan")`: getar 0,8, `Sfx.play("bonk")`,
   semburan daun `Ambient.burst` warna `hill_top`. `clear_hazards` memanggil `reset_current`. `_ai_hold`: kalau x ada di
   `[x0 − 500, x1]` sebuah lorong, target = `height_at(x_depan) − GAP/2`, dengan `x_depan = x + vel.x·0,35`.
-- [ ] **Step 4:** `--only=canopy` PASS, semua tes `failed=0`.
-- [ ] **Step 5: Commit** `feat(world): hutan canopy tunnel hazard and shared island hazard list`
+- [x] **Step 4:** `--only=canopy` PASS, semua tes `failed=0`.
+- [x] **Step 5: Commit** `feat(world): hutan canopy tunnel hazard and shared island hazard list`
 
 ### Task 3: Aturan game (judul, saran, popup, lolos, Lanjut)
 
@@ -115,22 +119,22 @@ semua rintangan saat Lanjut.
 - Produces: `const HAZARD_POPUPS := {"hutan": ["Awas lorong hutan!", "Terbang di tengah, jangan sentuh duri"]}`,
   `const HAZARD_PASS := {"hutan": ["LOLOS HUTAN!", 150]}` (langkah 2–4 cukup menambah entri).
 
-- [ ] **Step 1: Tes gagal:** `test_hutan_death_title` (judul "Tersangkut di hutan!", saran sesuai spec);
+- [x] **Step 1: Tes gagal:** `test_hutan_death_title` (judul "Tersangkut di hutan!", saran sesuai spec);
   `test_hutan_pass_points` (`hazard_passed("hutan")` → `style_points` +150); `test_continue_skips_canopy` (mati di laut
   tepat sebelum pulau Hutan yang lorong pertamanya < 200 px dari tanah kering → burung muncul setelah `x1 + 200`, skor tidak turun).
-- [ ] **Step 2:** `--only=hutan` dan `--only=continue` → FAIL.
-- [ ] **Step 3: Implementasi** sesuai Interfaces. Popup "Awas" memakai `Color("#b8ff8a")`. `_on_kite_spotted` dan
+- [x] **Step 2:** `--only=hutan` dan `--only=continue` → FAIL.
+- [x] **Step 3: Implementasi** sesuai Interfaces. Popup "Awas" memakai `Color("#b8ff8a")`. `_on_kite_spotted` dan
   `_on_wave_passed` tetap ada (tidak dirombak).
-- [ ] **Step 4:** tes PASS, semua `failed=0`.
-- [ ] **Step 5: Commit** `feat(game): hutan death title, warning popup, pass points, continue past canopies`
+- [x] **Step 4:** tes PASS, semua `failed=0`.
+- [x] **Step 5: Commit** `feat(game): hutan death title, warning popup, pass points, continue past canopies`
 
 ### Task 4: Verifikasi, screenshot, dokumen
 
 **Files:**
 - Modify: `CLAUDE.md` (baris hazard + perintah screenshot Hutan), spec (angka akhir langkah 1), plan ini (status)
 
-- [ ] **Step 1:** Cek wajib (import, `TESTS ... failed=0`, headless `--quit-after 600` tanpa `SCRIPT ERROR`/`ERROR`).
-- [ ] **Step 2:** Sim `godot --headless --path . --fixed-fps 120 res://scenes/game.tscn -- --island=2 --seed=11 --autoplay --sim --fresh --nosave`, lalu ulangi dengan `--seed=4242` → keduanya `cause=batas`.
-- [ ] **Step 3:** Cari seed/delay yang memperlihatkan mulut lorong di tepi kanan layar (`--island=2 --seed=4242 --shot=out.png --shot-delay=…`), lihat gambarnya, perbaiki keterbacaan kalau perlu, dan catat perintahnya di CLAUDE.md.
-- [ ] **Step 4:** Tulis "Angka akhir langkah 1" di spec, centang plan, dan set status selesai.
-- [ ] **Step 5: Commit** `docs: canopy step notes, plan status`, lalu push + PR sesuai CLAUDE.md.
+- [x] **Step 1:** Cek wajib (import, `TESTS ... failed=0`, headless `--quit-after 600` tanpa `SCRIPT ERROR`/`ERROR`).
+- [x] **Step 2:** Sim `godot --headless --path . --fixed-fps 120 res://scenes/game.tscn -- --island=2 --seed=11 --autoplay --sim --fresh --nosave`, lalu ulangi dengan `--seed=4242` → keduanya `cause=batas`.
+- [x] **Step 3:** Cari seed/delay yang memperlihatkan mulut lorong di tepi kanan layar (`--island=2 --seed=4242 --shot=out.png --shot-delay=…`), lihat gambarnya, perbaiki keterbacaan kalau perlu, dan catat perintahnya di CLAUDE.md.
+- [x] **Step 4:** Tulis "Angka akhir langkah 1" di spec, centang plan, dan set status selesai.
+- [x] **Step 5: Commit** `docs: canopy step notes, plan status`, lalu push + PR sesuai CLAUDE.md.

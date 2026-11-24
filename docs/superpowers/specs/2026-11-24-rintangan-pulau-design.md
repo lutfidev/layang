@@ -1,6 +1,6 @@
 # Rintangan khas tiap pulau + musik tiap pulau — design
 
-Status: disetujui pemilik repo (2026-11-24, "lanjut") · lanjutan dari `2026-11-24-tanpa-batas-design.md`
+Status: disetujui pemilik repo (2026-11-24, "lanjut"). Langkah 1 selesai (`feat/lorong-kanopi`) · lanjutan dari `2026-11-24-tanpa-batas-design.md`
 
 ## Intent (kenapa)
 
@@ -115,6 +115,17 @@ tanah tidak berubah, jadi seed lama tetap menghasilkan pulau yang sama.
 - Stamina: lorong pendek (≤ 1,5 dtk terbang), jadi stamina penuh cukup. Tes memastikan burung yang masuk dengan
   stamina ≥ 0,5 bisa lolos.
 - Autopilot: di dalam lorong targetnya garis tengah (`height_at − GAP/2`), dan dia mulai naik sebelum mulut lorong.
+
+### Angka akhir langkah 1
+- Bukit lorong dibuat landai: lembah y=40, puncak y=−40, termasuk lembah penutup lorong. Bukit terakhir pulau tidak
+  pernah dipilih (`pick_hills(hills − 1, 2, …)`). Alasannya, bukit acak (turun ±400 px dalam 420 px) tidak bisa
+  diikuti di lorong 300 px pada kecepatan fever. Urutan RNG bentuk tanah tetap.
+- `GAP` 300, semak 40 px, radius tabrakan burung 16 px. Atap digambar dan mematikan sampai y=−2600.
+  `roof_y` = rata-rata tinggi tanah di x−60, x, x+60, dikurangi 300.
+- 8 koin di garis tengah (10–90 % lebar lorong). Koin acak dijauhkan 60 px dari lorong.
+- Pohon raksasa "pintu" di mulut lorong tidak dipakai, karena batangnya menutup lorong secara visual.
+- Autopilot sudah lewat lorong dengan ketinggian menyusurinya (±70 px). Tetap ditambah target garis tengah di lorong.
+- Sim `--island=2` seed 11: `RUN score=21746 cause=batas`. Seed 4242: `RUN score=21538 cause=batas`.
 
 ## Langkah 2 — Semburan lava (Gunung Api Senja)
 

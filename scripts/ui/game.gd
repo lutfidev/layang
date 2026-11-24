@@ -5,12 +5,21 @@ const SUN_PROGRESS := 0.8      # fixed sun height: the sky no longer counts down
 const SIM_MAX := 240.0          # --sim runs end after this many seconds (cause "batas")
 const HIGH_FLIGHT := 520.0     # px above ground/water for "TERBANG TINGGI!"
 const WAVE_POINTS := 150        # style points for clearing a beach wave
-const CAUSE_TITLES := {"laut": "Tercebur ke laut!", "monster": "Digigit monster laut!", "ombak": "Terkena ombak", "layangan": "Tersangkut layangan!", "batas": "Simulasi selesai"}
+const CAUSE_TITLES := {"laut": "Tercebur ke laut!", "monster": "Digigit monster laut!", "ombak": "Terkena ombak", "layangan": "Tersangkut layangan!", "hutan": "Tersangkut di hutan!", "batas": "Simulasi selesai"}
 const CAUSE_TIPS := {
 	"laut": "Tahan untuk naik sebelum stamina habis di atas laut",
 	"monster": "Lihat tandanya di air, lalu naik tinggi menjauh",
 	"ombak": "Turun ke bawah gulungan ombak, tahan sedikit supaya tidak tercebur",
 	"layangan": "Terbang rendah di bawah ekor, atau tinggi di atasnya",
+	"hutan": "Terbang di tengah lorong: jauhi dahan dan semak berduri",
+}
+## Island hazards (World.hazard_spotted / hazard_passed): first-sighting popup [title, hint, colour]
+## and the pass reward [popup, style points].
+const HAZARD_POPUPS := {
+	"hutan": ["Awas lorong hutan!", "Terbang di tengah, jangan sentuh duri", Color("#b8ff8a")],
+}
+const HAZARD_PASS := {
+	"hutan": ["LOLOS HUTAN!", 150],
 }
 
 var world: World
@@ -62,6 +71,8 @@ func _ready() -> void:
 	world.bird_died.connect(_on_died)
 	world.wave_passed.connect(_on_wave_passed)
 	world.kite.spotted.connect(_on_kite_spotted)
+	world.hazard_spotted.connect(_on_hazard_spotted)
+	world.hazard_passed.connect(_on_hazard_passed)
 	world.bird_splashed.connect(func(): Sfx.play("splash"))
 	_build_hud()
 	if world.autoplay:
@@ -162,7 +173,7 @@ func _continue_run() -> void:
 	b.exhausted = false
 	b.on_ground = false
 	# respawn safely: forward onto the first gentle dry ground past the water (score never drops)
-	b.position.x = world.kite.safe_x_after(world.terrain.dry_ground_after(world.wave.safe_x_after(b.position.x)))
+	b.position.x = world.safe_x_after(b.position.x)
 	b.position.y = world.terrain.height_at(b.position.x) - 200.0
 	world.clear_hazards()
 	world.dead = false
@@ -230,6 +241,21 @@ func _on_wave_passed() -> void:
 	style_points += WAVE_POINTS
 	Sfx.play("perfect", 1.2)
 	_popup("LOLOS OMBAK!", "+%d" % WAVE_POINTS, Color("#7ff0e6"))
+
+
+func _on_hazard_spotted(cause: String) -> void:
+	if state == "play" and HAZARD_POPUPS.has(cause):
+		var p: Array = HAZARD_POPUPS[cause]
+		_popup(p[0], p[1], p[2])
+
+
+func _on_hazard_passed(cause: String) -> void:
+	if state != "play" or not HAZARD_PASS.has(cause):
+		return
+	var p: Array = HAZARD_PASS[cause]
+	style_points += int(p[1])
+	Sfx.play("perfect", 1.2)
+	_popup(p[0], "+%d" % int(p[1]), Color("#7ff0e6"))
 
 
 func _on_kite_spotted() -> void:

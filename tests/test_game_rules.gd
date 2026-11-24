@@ -257,3 +257,86 @@ func test_continue_never_lands_in_kite() -> String:
 			if safe < sp.y + 200.0:
 				return "x=%.0f -> %.0f, kite span %s" % [x, safe, sp]
 	return ""
+
+
+# ---------------------------------------------------------------- hutan canopies
+
+func test_hutan_death_title() -> String:
+	var g := _game()
+	g.world.bird_died.emit("hutan")
+	if g.state != "over" or g.end_cause != "hutan":
+		return "state=%s cause=%s" % [g.state, g.end_cause]
+	if not _has_text(g.result_panel, "Tersangkut di hutan!"):
+		return "results title missing"
+	return "" if _has_text(g.result_panel, "Terbang di tengah lorong: jauhi dahan dan semak berduri") else "tip missing"
+
+
+func test_hutan_pass_points() -> String:
+	var g := _game()
+	g.world.hazard_passed.emit("hutan")
+	if g.style_points != 150:
+		return "style_points=%d" % g.style_points
+	return "" if g.lbl_popup.text == "LOLOS HUTAN!" else "popup=%s" % g.lbl_popup.text
+
+
+func test_hutan_warns_once() -> String:
+	Game.dev["island"] = 2
+	var g := _game()
+	Game.dev.erase("island")
+	var w: World = g.world
+	var c: Dictionary = w.terrain.canopies[0]
+	w.bird.position = Vector2(float(c.x0) - 1300.0, w.terrain.height_at(float(c.x0) - 1300.0) - 150.0)
+	w.bird.on_ground = false
+	var shown := 0
+	for i in int(0.3 / DT):
+		g._physics_process(DT)
+		w._physics_process(DT)
+		if g.lbl_popup.text == "Awas lorong hutan!":
+			shown += 1
+	return "" if shown > 0 else "popup=%s" % g.lbl_popup.text
+
+
+func test_continue_skips_canopy() -> String:
+	Game.dev["island"] = 2
+	var g := _game()
+	Game.dev.erase("island")
+	var w: World = g.world
+	var deaths: Array = []
+	w.bird_died.connect(func(cause: String): deaths.append(cause))
+	var c: Dictionary = w.terrain.canopies[0]
+	for x in [float(c.x0) - 150.0, (float(c.x0) + float(c.x1)) * 0.5, float(c.x1)]:
+		if w.safe_x_after(x) < float(c.x1) + 200.0:
+			return "safe_x_after(%.0f) = %.0f inside canopy %s" % [x, w.safe_x_after(x), c]
+	# run into the thorns, then continue
+	w.bird.position = Vector2(float(c.x0) - 300.0, w.terrain.height_at(float(c.x0) - 300.0))
+	w.bird.on_ground = true
+	w.bird.vel = Vector2(Bird.SPEED_START, 0.0)
+	_frames(g, 3.0)
+	if deaths != ["hutan"] or g.state != "over":
+		return "did not hit the canopy: %s state=%s" % [deaths, g.state]
+	var before: int = g.score()
+	g._continue_run()
+	if w.bird.position.x < float(c.x1) + 200.0:
+		return "respawn inside the canopy x=%.0f" % w.bird.position.x
+	# 1 s only: a bird left without input lands and would (fairly) run into the next tunnel's thorns
+	_frames(g, 1.0)
+	if g.score() < before:
+		return "score dropped %d -> %d" % [before, g.score()]
+	return "" if deaths.size() == 1 else "died again right after continue: %s" % [deaths]
+
+
+func test_safe_x_after_matches_plain_chain() -> String:
+	# with no island hazard in the way, "Lanjut" lands where the old wave→dry ground→kite chain put it
+	for first in [0, 1]:
+		var w := World.new()
+		w.run_seed = 4242
+		w.start_island = first
+		runner.add_child(w)
+		var x := _sea_start(w) + 50.0
+		var want := w.kite.safe_x_after(w.terrain.dry_ground_after(w.wave.safe_x_after(x)))
+		var got := w.safe_x_after(x)
+		runner.remove_child(w)
+		w.free()
+		if absf(got - want) > 0.5:
+			return "start %d: safe_x_after=%.0f, plain chain=%.0f" % [first, got, want]
+	return ""

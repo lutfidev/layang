@@ -24,6 +24,11 @@ const KITE_ARC_COINS := 10
 const KITE_ARC_HALF := 300.0
 const KITE_ARC_TOP := 520.0                  # arc apex at peak_y - this; its ends sit 120 px lower
 
+const CANOPIES_PER_ISLAND := 2
+const CANOPY_COINS := 8
+const CANOPY_VALLEY_Y := 40.0               # canopy hills are gentle: a corridor must be flyable at fever speed
+const CANOPY_PEAK_Y := -40.0
+
 var run_seed: int = 1
 var start_island: int = 0
 
@@ -38,6 +43,8 @@ var props: Array = []                         # [{x, kind, island, s}]
 var bays: Array = []
 ## Sawah kites, sorted by x: {x (= the peak's x), peak_y, island, color}
 var kites: Array = []
+## Hutan canopy tunnels, sorted by x: {x0, x1, island} (x0 = valley before the hill, x1 = valley after it)
+var canopies: Array = []
 
 var coins: CoinField
 var _islands_generated := 0
@@ -239,6 +246,13 @@ func _generate_island() -> void:
 		var kite_rng := RandomNumberGenerator.new()
 		kite_rng.seed = run_seed * 4271 + k * 65537
 		kite_hills = pick_hills(hills, KITES_PER_ISLAND, kite_rng)
+	var canopy_hills: Array[int] = []
+	if biome.id == "hutan":
+		var canopy_rng := RandomNumberGenerator.new()
+		canopy_rng.seed = run_seed * 5381 + k * 77003
+		# never the last hill: its far side is the steep drop to the launch ramp
+		canopy_hills = pick_hills(hills - 1, CANOPIES_PER_ISLAND, canopy_rng)
+	var open_canopy := -1
 
 	var hill_start_key := keys_x.size() - 1
 	for h in hills:
@@ -248,11 +262,20 @@ func _generate_island() -> void:
 			_add_bay(vx, k, biome)
 			continue
 		var vy := rng.randf_range(60.0, 150.0) * amp
+		if h in canopy_hills or open_canopy >= 0:
+			vy = CANOPY_VALLEY_Y
 		_add_key(Vector2(vx, vy), k)
+		if open_canopy >= 0:
+			canopies[open_canopy].x1 = vx
+			open_canopy = -1
 		var px := vx + rng.randf_range(420.0, 700.0) * wid
 		var py := -rng.randf_range(50.0, 165.0) * amp
 		if h == 0:
 			py = -80.0
+		if h in canopy_hills:
+			py = CANOPY_PEAK_Y
+			canopies.append({"x0": vx, "x1": px, "island": k})
+			open_canopy = canopies.size() - 1
 		_add_key(Vector2(px, py), k)
 		if h in kite_hills:
 			kites.append({"x": px, "peak_y": py, "island": k, "color": h % 3})
@@ -310,6 +333,12 @@ func _place_items(k: int, first_key: int, last_key: int, rng: RandomNumberGenera
 			for j in TUBE_COINS:
 				var x := lerpf(float(tb.water_x0) - 20.0, float(tb.water_x1) + 20.0, j / float(TUBE_COINS - 1))
 				coins.add_item(Vector2(x, TUBE_COIN_Y), CoinField.COIN)
+		var canopy := _canopy_starting(x0)
+		if canopy >= 0:
+			var cn: Dictionary = canopies[canopy]
+			for j in CANOPY_COINS:
+				var x := lerpf(float(cn.x0), float(cn.x1), 0.1 + 0.8 * j / float(CANOPY_COINS - 1))
+				coins.add_item(Vector2(x, height_at(x) - Canopy.GAP * 0.5), CoinField.COIN)
 		if downhill and roll < 0.34:
 			for j in 6:
 				var t := 0.22 + j * 0.1
@@ -339,9 +368,9 @@ func _place_items(k: int, first_key: int, last_key: int, rng: RandomNumberGenera
 		i += 1
 
 
-## Adds a coin unless it would sit inside a bay's wave (coins must never lure the bird into it).
+## Adds a coin unless it would sit inside a bay's wave or a canopy tunnel (coins must never lure the bird into it).
 func _add_coin(p: Vector2) -> void:
-	if not in_wave_shape(p, WAVE_COIN_PAD):
+	if not in_wave_shape(p, WAVE_COIN_PAD) and canopy_at(p.x, 60.0) < 0:
 		coins.add_item(p, CoinField.COIN)
 
 
@@ -361,6 +390,21 @@ func in_wave_shape(p: Vector2, pad: float) -> bool:
 func _bay_with_lip(x: float) -> int:
 	for i in bays.size():
 		if absf(float(bays[i].lip_x) - x) < 0.5:
+			return i
+	return -1
+
+
+## Index of the canopy whose span (widened by `pad`) holds x, or -1.
+func canopy_at(x: float, pad: float = 0.0) -> int:
+	for i in canopies.size():
+		if x > float(canopies[i].x0) - pad and x < float(canopies[i].x1) + pad:
+			return i
+	return -1
+
+
+func _canopy_starting(x: float) -> int:
+	for i in canopies.size():
+		if absf(float(canopies[i].x0) - x) < 0.5:
 			return i
 	return -1
 
