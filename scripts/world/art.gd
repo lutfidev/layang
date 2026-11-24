@@ -344,11 +344,14 @@ static func kite(ci: CanvasItem, c: Vector2, hw: float, hh: float, col: Color, a
 
 
 static func kite_tail(ci: CanvasItem, pts: PackedVector2Array, col: Color) -> void:
-	ci.draw_polyline(pts, col.darkened(0.2), 2.0, true)
+	# the deadly part: a dark cord with big bows so it reads from a screen away
+	ci.draw_polyline(pts, col.darkened(0.55), 3.0, true)
 	for i in range(1, pts.size()):
 		var p := pts[i]
-		ci.draw_colored_polygon(PackedVector2Array([p + Vector2(-8, -4), p + Vector2(0, 0), p + Vector2(-8, 4)]), col)
-		ci.draw_colored_polygon(PackedVector2Array([p + Vector2(8, -4), p + Vector2(0, 0), p + Vector2(8, 4)]), col)
+		var bow := col if i % 2 == 0 else col.darkened(0.25)
+		ci.draw_colored_polygon(PackedVector2Array([p + Vector2(-12, -7), p, p + Vector2(-12, 7)]), bow)
+		ci.draw_colored_polygon(PackedVector2Array([p + Vector2(12, -7), p, p + Vector2(12, 7)]), bow)
+		ci.draw_circle(p, 2.5, col.darkened(0.55))
 
 
 ## A villager flying a kite; returns the hand position (where the string starts).

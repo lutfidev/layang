@@ -126,5 +126,5 @@ func _draw() -> void:
 			var f := i / 12.0
 			line.append(hand.lerp(anchor, f) + Vector2(0.0, sin(f * PI) * 40.0))
 		draw_polyline(line, Color(1, 1, 1, 0.55), 1.5, true)
-		Art.kite_tail(self, tail_points(k, _anim), pal[1])
+		Art.kite_tail(self, tail_points(k, _anim), pal[0])
 		Art.kite(self, c, BODY_HW, BODY_HH, pal[0], pal[1])

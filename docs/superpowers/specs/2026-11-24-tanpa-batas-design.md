@@ -1,6 +1,6 @@
 # Layang Tanpa Batas — design
 
-Status: disetujui (tahap 1 selesai, PR #2; tahap 2 selesai, PR #3; tahap 3 menunggu persetujuan, `feat/layangan-sawah`) · 2026-11-24 · lanjutan dari `2026-11-24-tahan-naik-design.md`
+Status: disetujui (tahap 1 selesai, PR #2; tahap 2 selesai, PR #3; tahap 3 selesai di `feat/layangan-sawah`) · 2026-11-24 · lanjutan dari `2026-11-24-tahan-naik-design.md`
 
 ## Intent (kenapa)
 
@@ -194,6 +194,15 @@ Pemain memilih A (2026-11-24).
 - **Dunia menu/toko (`hazards = false`):** layangan tetap digambar, tidak mematikan. Autopilot (menyusuri ±70 px)
   sudah lewat di bawah ekor, jadi tidak perlu logika baru. Sim tetap mencapai batas 240 dtk.
 - **Di luar tahap ini:** layangan di pulau lain, layangan yang bergerak, dan dua layangan berdekatan (tahap 5).
+
+### Angka akhir tahap 3
+- `Terrain`: 2 layangan per pulau Sawah (`pick_hills`, RNG `run_seed * 4271 + k * 65537`), `x` = x puncak bukit.
+  Busur 10 koin: `x ± 300`, puncak busur `peak_y − 520`, ujungnya 120 px lebih rendah.
+- `Kite`: badan di `peak_y − 400` (±34×44, goyang ±8), ekor 10 ruas ke ujung `(x − 40, peak_y − 170)`, kibar ±20 px
+  ke samping; radius tabrakan burung 16 px (lebih kecil dari `Bird.RADIUS` 22). Popup muncul 1400 px sebelum layangan
+  pertama. Warga berdiri 360 px sebelum puncak.
+- Ekor digambar dengan warna utama layangan (bukan warna aksen) supaya terbaca di langit terang.
+- Sim seed 11 dan 4242: `cause=batas` (skor ≈21.240/21.390), autopilot tidak pernah tersangkut.
 
 ### Bukti selesai (tahap 3)
 - Tes: untuk beberapa seed, setiap pulau Sawah punya tepat 2 layangan, tidak di 2 bukit pertama, tidak berurutan;
