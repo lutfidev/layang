@@ -115,14 +115,12 @@ func test_canopy_coins() -> String:
 
 # ---------------------------------------------------------------- the Canopy hazard
 
-func _ground_speed(x: float, fever: bool) -> float:
-	var target := lerpf(Bird.SPEED_START, Bird.SPEED_MAX, clampf(x / Bird.SPEED_RAMP_X, 0.0, 1.0))
-	return 0.85 * target * (1.3 if fever else 1.0)
-
-
 ## Flies the bird from x0 to past the tunnel's end (or until it dies); `hold` decides holding each step.
 ## Returns [deaths, passes].
-func _fly(w: World, c: Dictionary, x0: float, y0: float, ground: bool, speed: float, fever: bool, hold: Callable) -> Array:
+## `pin` keeps vel.x at `speed` (Bird.step would ease it back to the ramp target near the start); `stamina`
+## < 0 refills stamina every step, otherwise the bird starts with that much and must manage it.
+func _fly(w: World, c: Dictionary, x0: float, y0: float, ground: bool, speed: float, fever: bool, hold: Callable,
+		pin: bool = false, stamina: float = -1.0) -> Array:
 	var deaths: Array = []
 	var passes: Array = []
 	w.bird_died.connect(func(cause: String): deaths.append(cause))
@@ -132,12 +130,17 @@ func _fly(w: World, c: Dictionary, x0: float, y0: float, ground: bool, speed: fl
 	b.on_ground = ground
 	b.fever = fever
 	b.vel = Vector2(speed, 0.0)
+	if stamina >= 0.0:
+		b.stamina = stamina
 	var end_x: float = float(c.x1) + 200.0
 	w.input_enabled = true
 	var t := 0.0
 	while t < 10.0 and deaths.is_empty() and b.position.x < end_x:
 		w._touch_hold = hold.call(b)
-		b.stamina = 1.0
+		if stamina < 0.0:
+			b.stamina = 1.0
+		if pin:
+			b.vel.x = speed
 		w._physics_process(DT)
 		t += DT
 	return [deaths, passes]
@@ -165,7 +168,8 @@ func test_canopy_center_path_passes() -> String:
 				var fever: bool = mode == "fever"
 				if fever:
 					speed = Bird.SPEED_MAX * 1.3
-				var r := _fly(w, c, x0, tr.height_at(x0) - Canopy.GAP * 0.5, false, speed, fever, _centre(tr))
+				# real fever / max speed through the whole tunnel, entering with half stamina (spec)
+				var r := _fly(w, c, x0, tr.height_at(x0) - Canopy.GAP * 0.5, false, speed, fever, _centre(tr), mode != "start", 0.5)
 				_free(w)
 				if not r[0].is_empty():
 					return "seed %d %s canopy %d: died %s" % [s, mode, i, r[0]]

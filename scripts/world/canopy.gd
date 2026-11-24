@@ -76,9 +76,9 @@ func update(delta: float, bird_center: Vector2, bird_x: float, bird_on_ground: b
 ## Moves x forward past any tunnel it is inside of or less than 200 px before (respawn after "Lanjut").
 func safe_x_after(x: float) -> float:
 	for i in terrain.canopies.size():
-		var sp := span(terrain.canopies[i])
-		if x >= sp.x - 200.0 and x <= sp.y:
-			x = sp.y + 200.0
+		var c: Dictionary = terrain.canopies[i]
+		if x >= float(c.x0) - 200.0 and x <= float(c.x1):   # floats, not span(): Vector2 is float32
+			x = float(c.x1) + 200.0
 			if _inside == i:
 				_inside = -1
 	return x

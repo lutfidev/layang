@@ -318,7 +318,25 @@ func test_continue_skips_canopy() -> String:
 	g._continue_run()
 	if w.bird.position.x < float(c.x1) + 200.0:
 		return "respawn inside the canopy x=%.0f" % w.bird.position.x
-	_frames(g, 2.0)
+	# 1 s only: a bird left without input lands and would (fairly) run into the next tunnel's thorns
+	_frames(g, 1.0)
 	if g.score() < before:
 		return "score dropped %d -> %d" % [before, g.score()]
 	return "" if deaths.size() == 1 else "died again right after continue: %s" % [deaths]
+
+
+func test_safe_x_after_matches_plain_chain() -> String:
+	# with no island hazard in the way, "Lanjut" lands where the old wave→dry ground→kite chain put it
+	for first in [0, 1]:
+		var w := World.new()
+		w.run_seed = 4242
+		w.start_island = first
+		runner.add_child(w)
+		var x := _sea_start(w) + 50.0
+		var want := w.kite.safe_x_after(w.terrain.dry_ground_after(w.wave.safe_x_after(x)))
+		var got := w.safe_x_after(x)
+		runner.remove_child(w)
+		w.free()
+		if absf(got - want) > 0.5:
+			return "start %d: safe_x_after=%.0f, plain chain=%.0f" % [first, got, want]
+	return ""

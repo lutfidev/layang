@@ -142,9 +142,14 @@ func _add_island_hazard(h: Node2D) -> void:
 
 ## Moves x forward until it is clear of every hazard and on gentle dry ground (respawn after "Lanjut").
 func safe_x_after(x: float) -> float:
+	# dry_ground_after always steps 120 px forward, so it runs once; hazard pushes land on dry ground
+	x = _past_island_hazards(wave.safe_x_after(x))
+	return _past_island_hazards(kite.safe_x_after(terrain.dry_ground_after(x)))
+
+
+func _past_island_hazards(x: float) -> float:
 	for _i in 8:
-		var nx := terrain.dry_ground_after(wave.safe_x_after(x))
-		nx = kite.safe_x_after(nx)
+		var nx := kite.safe_x_after(x)
 		for h in _island_hazards:
 			nx = h.safe_x_after(nx)
 		if absf(nx - x) < 0.5:
