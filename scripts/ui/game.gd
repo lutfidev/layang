@@ -339,7 +339,8 @@ func _on_died(cause: String) -> void:
 	if state != "play":
 		return
 	if not level.is_empty() and world.bird.position.x >= world.terrain.island_finish[0]:
-		_finish_level()   # hit on the frame it reached the gate: the level still counts
+		world.dead = false   # hit on the frame it reached the gate: the level still counts and the bird glides on
+		_finish_level()
 		return
 	_finish(cause)
 

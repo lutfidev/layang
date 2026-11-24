@@ -479,10 +479,15 @@ func test_death_at_gate_finishes_level() -> String:
 	var g := _level_game("sawah-1")
 	var w: World = g.world
 	w.bird.position.x = w.terrain.island_finish[0] + 2.0
-	w.bird_died.emit("layangan")
+	w._die("layangan")
+	var x0 := w.bird.position.x
+	for i in 30:
+		w._physics_process(DT)
 	var r := ""
 	if g.state != "done":
 		r = "state %s, want done" % g.state
+	elif w.bird.position.x <= x0:
+		r = "bird frozen at the gate after the hit"
 	elif not _has_text(g.result_panel, "Level selesai!"):
 		r = "no level done title"
 	_free_node(g)
