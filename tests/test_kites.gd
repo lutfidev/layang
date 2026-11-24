@@ -110,3 +110,162 @@ func test_kite_coin_arc() -> String:
 				return "seed %d kite x=%.0f: %d arc coins" % [s, float(kt.x), n]
 		_free(w)
 	return ""
+
+
+# ---------------------------------------------------------------- the Kite hazard
+
+func _ground_speed(x: float, fever: bool) -> float:
+	var target := lerpf(Bird.SPEED_START, Bird.SPEED_MAX, clampf(x / Bird.SPEED_RAMP_X, 0.0, 1.0))
+	return 0.85 * target * (1.3 if fever else 1.0)
+
+
+## Flies the bird from x0 past the kite (or until it dies). `hold` decides holding each step.
+func _fly(w: World, kt: Dictionary, x0: float, y0: float, ground: bool, fever: bool, hold: Callable) -> Array:
+	var deaths: Array = []
+	w.bird_died.connect(func(c: String): deaths.append(c))
+	var b := w.bird
+	b.position = Vector2(x0, w.terrain.height_at(x0) if ground else y0)
+	b.on_ground = ground
+	b.fever = fever
+	b.vel = Vector2(_ground_speed(x0, fever), 0.0)
+	var end_x: float = Kite.span(kt).y + 100.0
+	w.input_enabled = true     # World reads holding from input: drive it through the touch flag
+	var t := 0.0
+	while t < 8.0 and deaths.is_empty() and b.position.x < end_x:
+		w._touch_hold = hold.call(b)
+		b.stamina = 1.0
+		w._physics_process(DT)
+		t += DT
+	return deaths
+
+
+func test_tail_clearance() -> String:
+	for s in SEEDS:
+		var w := _world(s)
+		for kt in w.terrain.kites:
+			var t := 0.0
+			while t <= 4.0:
+				var pts := Kite.tail_points(kt, t)
+				if absf(pts[pts.size() - 1].y - (float(kt.peak_y) - Kite.TAIL_CLEAR)) > 0.5:
+					_free(w)
+					return "tail tip y=%.1f, want %.1f" % [pts[pts.size() - 1].y, float(kt.peak_y) - Kite.TAIL_CLEAR]
+				for p in pts:
+					if w.terrain.height_at(p.x) - p.y < Kite.TAIL_CLEAR - 0.5:
+						_free(w)
+						return "seed %d kite x=%.0f t=%.2f: tail %.1f above ground" % [s, float(kt.x), t, w.terrain.height_at(p.x) - p.y]
+				t += 0.05
+		_free(w)
+	return ""
+
+
+func test_ground_run_passes_under() -> String:
+	for s in SEEDS:
+		for fever in [false, true]:
+			var probe := _world(s)
+			var n: int = _kites_on(probe, 0).size()
+			_free(probe)
+			for i in n:
+				var w := _world(s)
+				var kt: Dictionary = _kites_on(w, 0)[i]
+				var d := _fly(w, kt, float(kt.x) - 600.0, 0.0, true, fever, func(_b: Bird) -> bool: return false)
+				_free(w)
+				if not d.is_empty():
+					return "seed %d fever %s kite %d: %s" % [s, fever, i, d]
+	return ""
+
+
+func test_skim_passes_under() -> String:
+	for s in SEEDS:
+		for fever in [false, true]:
+			var probe := _world(s)
+			var n: int = _kites_on(probe, 0).size()
+			_free(probe)
+			for i in n:
+				var w := _world(s)
+				var kt: Dictionary = _kites_on(w, 0)[i]
+				var tr := w.terrain
+				var d := _fly(w, kt, float(kt.x) - 600.0, 0.0, true, fever,
+						func(b: Bird) -> bool: return b.position.y > tr.height_at(b.position.x) - Bird.SKIM_HEIGHT)
+				_free(w)
+				if not d.is_empty():
+					return "seed %d fever %s kite %d: %s" % [s, fever, i, d]
+	return ""
+
+
+func _level(y: float) -> Callable:
+	return func(b: Bird) -> bool: return b.center().y > y
+
+
+func test_body_height_dies() -> String:
+	for s in SEEDS:
+		var w := _world(s)
+		var kt: Dictionary = _kites_on(w, 0)[0]
+		var y := Kite.body_center(kt, 0.0).y
+		var d := _fly(w, kt, float(kt.x) - 500.0, y + Bird.RADIUS, false, false, _level(y))
+		var at := w.bird.position.x
+		_free(w)
+		if d != ["layangan"]:
+			return "seed %d: deaths=%s" % [s, d]
+		if at > float(kt.x) + 100.0:
+			return "seed %d: died late at x=%.0f" % [s, at]
+	return ""
+
+
+func test_over_body_survives() -> String:
+	for s in SEEDS:
+		var w := _world(s)
+		var kt: Dictionary = _kites_on(w, 0)[0]
+		var y := Kite.body_center(kt, 0.0).y - Kite.BODY_HH - 90.0
+		var d := _fly(w, kt, float(kt.x) - 500.0, y + Bird.RADIUS, false, false, _level(y))
+		_free(w)
+		if not d.is_empty():
+			return "seed %d: deaths=%s" % [s, d]
+	return ""
+
+
+func test_coins_outside_hit_zone() -> String:
+	for s in SEEDS:
+		var w := _world(s)
+		for kt in w.terrain.kites:
+			for p in _arc_coins(w, kt):
+				var t := 0.0
+				while t <= 4.0:
+					if Kite.hits(kt, t, p):
+						_free(w)
+						return "seed %d kite x=%.0f: coin %s inside the hit zone at t=%.2f" % [s, float(kt.x), p, t]
+					t += 0.05
+		_free(w)
+	return ""
+
+
+func test_menu_world_no_kite_death() -> String:
+	var w := _world(4242, 0, false)
+	var kt: Dictionary = _kites_on(w, 0)[0]
+	var y := Kite.body_center(kt, 0.0).y
+	var d := _fly(w, kt, float(kt.x) - 500.0, y + Bird.RADIUS, false, false, _level(y))
+	var at := w.bird.position.x
+	_free(w)
+	if not d.is_empty():
+		return "deaths=%s" % [d]
+	return "" if at > Kite.span(kt).y else "stopped at x=%.0f" % at
+
+
+func test_autopilot_clears_kites() -> String:
+	for s in [11, 22, 33, 44, 55]:
+		var w := _world(s)
+		w.autoplay = true
+		var deaths: Array = []
+		w.bird_died.connect(func(c: String): deaths.append(c))
+		var ks := _kites_on(w, 0)
+		var end_x: float = Kite.span(ks[ks.size() - 1]).y + 100.0
+		var t := 0.0
+		while t < 90.0 and deaths.is_empty() and w.bird.position.x < end_x:
+			w._physics_process(DT)
+			t += DT
+		var at := w.bird.position.x
+		_free(w)
+		if not deaths.is_empty():
+			return "seed %d: died (%s) at x=%.0f" % [s, deaths[0], at]
+		if at < end_x:
+			return "seed %d: only reached x=%.0f" % [s, at]
+	return ""
