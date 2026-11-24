@@ -287,25 +287,78 @@ func test_mission_endless_island_in_endless() -> String:
 	return "" if p == 3 else "progress %d, want 3" % p
 
 
+## Presses a pause-panel button with a fake scene change; returns the paths it was asked to go to.
+func _press_pause(g: Node, text: String) -> Array:
+	var went: Array = []
+	g.goto_scene = func(path: String): went.append(path)
+	g._toggle_pause()
+	var b := _find_button(g.pause_panel, text)
+	if b:
+		b.pressed.emit()
+	runner.get_tree().paused = false
+	return went
+
+
 func test_mission_pause_menu_settles() -> String:
 	var keep := Game.save_data()
 	var g := _game()
 	_force(["skim_10"])
 	Game.missions[0].progress = 10
 	var coins0 := Game.coins
-	g._toggle_pause()
-	var b := _find_button(g.pause_panel, "Menu Utama")
+	var went := _press_pause(g, "Menu Utama")
 	var r := ""
-	if b == null:
-		r = "no Menu Utama button"
-	else:
-		b.pressed.emit()
-		if Game.coins - coins0 != 50:
-			r = "coins +%d, want +50" % (Game.coins - coins0)
-		elif _progress("skim_10") != -1:
-			r = "finished mission not replaced"
-	Game._busy = false
-	runner.get_tree().paused = false
+	if went != ["res://scenes/main_menu.tscn"]:
+		r = "went %s" % [went]
+	elif Game.coins - coins0 != 50:
+		r = "coins +%d, want +50" % (Game.coins - coins0)
+	elif _progress("skim_10") != -1:
+		r = "finished mission not replaced"
+	Game.apply_save(keep)
+	return r
+
+
+func test_mission_pause_exit_banks_coins() -> String:
+	var keep := Game.save_data()
+	var g := _game()
+	_force(["skim_10"])
+	Game.missions[0].progress = 10
+	g.coins_run = 7
+	var coins0 := Game.coins
+	_press_pause(g, "Menu Utama")
+	var gain := Game.coins - coins0
+	Game.apply_save(keep)
+	return "" if gain == 57 else "coins +%d, want +57 (7 run coins + 50 reward)" % gain
+
+
+func test_mission_pause_exit_stops_run() -> String:
+	var keep := Game.save_data()
+	var g := _game()
+	_press_pause(g, "Ulang")
+	var r := ""
+	if g.state != "over":
+		r = "state %s, want over" % g.state
+	elif g.world.running:
+		r = "world still running under the fade"
+	Game.apply_save(keep)
+	return r
+
+
+func test_mission_results_keep_first_payout() -> String:
+	var keep := Game.save_data()
+	var g := _game()
+	_force(["skim_10", "coins_150", "pass_5"])
+	Game.missions[0].progress = 10
+	g._finish("laut")
+	g._continue_run()
+	g.world.item_collected.emit(0, g.world.bird.position)
+	g._finish("laut")
+	var r := ""
+	if _count_label(g.result_panel, "Selesai! +50") != 1:
+		r = "first payout missing from the last results"
+	elif _count_label(g.result_panel, Missions.label(Missions.get_mission("coins_150"))) != 1:
+		r = "coins mission row missing"
+	elif g.missions_done.size() != 1:
+		r = "missions_done %s" % [g.missions_done]
 	Game.apply_save(keep)
 	return r
 
