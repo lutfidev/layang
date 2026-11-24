@@ -9,7 +9,7 @@ const CAUSE_TITLES := {"laut": "Tercebur ke laut!", "monster": "Digigit monster 
 const CAUSE_TIPS := {
 	"laut": "Tahan untuk naik sebelum stamina habis di atas laut",
 	"monster": "Lihat tandanya di air, lalu naik tinggi menjauh",
-	"ombak": "Sentuh bibir oranye untuk melompati ombak",
+	"ombak": "Turun ke bawah gulungan ombak, tahan sedikit supaya tidak tercebur",
 	"layangan": "Terbang rendah di bawah ekor, atau tinggi di atasnya",
 }
 
@@ -91,7 +91,7 @@ func _start() -> void:
 		lbl_hint.show()
 		hint_t = 14.0
 	if world.current_biome().id == "pantai":
-		_popup("Awas ombak!", "Sentuh bibir oranye untuk melompat", Color("#7ff0e6"))
+		_popup("Awas ombak raksasa!", "Terbang rendah lewat gulungannya", Color("#7ff0e6"))
 
 
 func _physics_process(delta: float) -> void:
@@ -162,7 +162,7 @@ func _continue_run() -> void:
 	b.exhausted = false
 	b.on_ground = false
 	# respawn safely: forward onto the first gentle dry ground past the water (score never drops)
-	b.position.x = world.kite.safe_x_after(world.terrain.dry_ground_after(b.position.x))
+	b.position.x = world.kite.safe_x_after(world.terrain.dry_ground_after(world.wave.safe_x_after(b.position.x)))
 	b.position.y = world.terrain.height_at(b.position.x) - 200.0
 	world.clear_hazards()
 	world.dead = false
@@ -180,7 +180,7 @@ func _on_island(k: int, biome: Dictionary) -> void:
 	Ambient.burst(world, world.bird.center(), Color("#ffe066"), 40, 700.0)
 	_show_banner(k, biome)
 	if biome.id == "pantai":
-		_popup("Awas ombak!", "Sentuh bibir oranye untuk melompat", Color("#7ff0e6"))
+		_popup("Awas ombak raksasa!", "Terbang rendah lewat gulungannya", Color("#7ff0e6"))
 
 
 func _on_item(_kind: int, _pos: Vector2) -> void:

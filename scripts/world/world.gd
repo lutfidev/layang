@@ -111,9 +111,6 @@ func _ready() -> void:
 	bird.landed.connect(_on_landed)
 	bird.splashed.connect(_on_splash)
 	bird.skimmed.connect(func(d: float): bird_skimmed.emit(d))
-	bird.kicked.connect(func():
-		if hazards:
-			Sfx.play("whoosh", 1.3))
 
 	_biome_to = Biomes.get_biome(start_island)
 	_biome_from = _biome_to
@@ -228,7 +225,8 @@ func clear_hazards() -> void:
 
 
 ## Autopilot (menu, shop, balance sim): skims ~70 px over the hills, cruises over the sea,
-## and climbs out of reach when the sea monster warns, after a seeded, sometimes slow reaction.
+## climbs out of reach when the sea monster warns (after a seeded, sometimes slow reaction),
+## and near a Pantai bay drops to the ground and flies through the wave's tube.
 func _ai_hold() -> bool:
 	if _ai_rng == null:
 		_ai_rng = RandomNumberGenerator.new()
@@ -251,6 +249,14 @@ func _ai_hold() -> bool:
 		for i in range(1, 7):
 			top = minf(top, terrain.height_at(x + vx * 0.12 * i))
 		target = minf(top, Terrain.WATER_Y) - 70.0
+		var i_bay := terrain.next_bay(x)
+		if i_bay >= 0:
+			var bay: Dictionary = terrain.bays[i_bay]
+			if x > float(bay.lip_x) - 900.0:
+				if x + vx * 0.3 >= float(bay.water_x0):
+					target = Terrain.WATER_Y - 160.0
+				else:
+					target = maxf(target + 50.0, Wave.TUBE_TOP + 90.0)
 	var predicted := b.position.y + b.vel.y * 0.2
 	return predicted > target
 

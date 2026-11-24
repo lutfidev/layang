@@ -7,7 +7,7 @@ const DEPTH := 1700.0
 const SEA_FLOOR := 470.0
 const WATER_Y := 300.0
 const SAMPLE := 14.0
-# Pantai bays: water-filled valleys with a launch lip before them (see Bird.LIP_KICK)
+# Pantai bays: water-filled valleys behind a lip; a curling wave (see Wave) stands over each one
 const BAYS_PER_ISLAND := 3
 const BAY_VALLEY_Y := 60.0
 const LIP_Y := -60.0
@@ -15,10 +15,9 @@ const LIP_RAMP := 480.0
 const BAY_FLOOR_Y := 380.0
 const BAY_HALF := 300.0
 const BANK_Y := 40.0
-const KICK_BEFORE := 40.0
-const KICK_AFTER := 10.0
-const LIP_COLOR := Color("#ff7a59")
-const LIP_EDGE := Color("#ffe066")
+const TUBE_COINS := 6
+const TUBE_COIN_Y := WATER_Y - 150.0         # the middle of the wave's tube
+const WAVE_COIN_PAD := 120.0                # also keeps coins off the wave's pale far copy
 # Sawah kites: villagers' kites hang over chosen peaks (see Kite); a coin arc runs over each one
 const KITES_PER_ISLAND := 2
 const KITE_ARC_COINS := 10
@@ -117,17 +116,9 @@ func bay_at(x: float) -> int:
 ## The first bay the bird at x has not fully passed yet, or -1.
 func next_bay(x: float) -> int:
 	for i in bays.size():
-		if bays[i].water_x1 + Wave.WAVE_HALF > x:
+		if bays[i].water_x1 + Wave.COL_PAD > x:
 			return i
 	return -1
-
-
-## True on the launch zone at the top of a bay's lip.
-func kick_at(x: float) -> bool:
-	for b in bays:
-		if x >= b.lip_x - KICK_BEFORE and x <= b.lip_x + KICK_AFTER:
-			return true
-	return false
 
 
 ## True on the far bank of a bay, where a landing never counts as a bonk.
@@ -145,7 +136,7 @@ func dry_ground_after(x: float) -> float:
 	while x < limit and is_water_at(x):
 		x += 10.0
 	x += 120.0
-	while x < limit and (is_water_at(x) or slope_at(x) < -0.3 or kick_at(x)):
+	while x < limit and (is_water_at(x) or slope_at(x) < -0.3):
 		x += 10.0
 	return x
 
@@ -312,24 +303,31 @@ func _place_items(k: int, first_key: int, last_key: int, rng: RandomNumberGenera
 		var x1 := keys_x[i + 1]
 		var downhill := keys_y[i + 1] > keys_y[i]
 		var roll := rng.randf()
+		var tube := _bay_with_lip(x0)
+		if tube >= 0:
+			# guide coins through the wave's tube: low under the curl, clear of the water
+			var tb: Dictionary = bays[tube]
+			for j in TUBE_COINS:
+				var x := lerpf(float(tb.water_x0) - 20.0, float(tb.water_x1) + 20.0, j / float(TUBE_COINS - 1))
+				coins.add_item(Vector2(x, TUBE_COIN_Y), CoinField.COIN)
 		if downhill and roll < 0.34:
 			for j in 6:
 				var t := 0.22 + j * 0.1
 				var x := lerpf(x0, x1, t)
 				if is_water_at(x):
 					continue
-				coins.add_item(Vector2(x, height_at(x) - 38.0), CoinField.COIN)
+				_add_coin(Vector2(x, height_at(x) - 38.0))
 		elif (not downhill) and _is_kite_x(x1):
 			# the risky high line over a kite: a bigger arc above its body (the low line gets nothing extra)
 			for j in KITE_ARC_COINS:
 				var u := -1.0 + 2.0 * j / float(KITE_ARC_COINS - 1)
-				coins.add_item(Vector2(x1 + u * KITE_ARC_HALF, keys_y[i + 1] - KITE_ARC_TOP + u * u * 120.0), CoinField.COIN)
+				_add_coin(Vector2(x1 + u * KITE_ARC_HALF, keys_y[i + 1] - KITE_ARC_TOP + u * u * 120.0))
 		elif (not downhill) and roll < 0.3:
 			var cx := x1 + 260.0
 			var top := keys_y[i + 1] - rng.randf_range(250.0, 420.0)
 			for j in 7:
 				var u := (j - 3) / 3.0
-				coins.add_item(Vector2(cx + u * 240.0, top + u * u * 120.0), CoinField.COIN)
+				_add_coin(Vector2(cx + u * 240.0, top + u * u * 120.0))
 		# props on the ground
 		var n := 2 if prop_kind == "rice" else 1
 		for j in n:
@@ -339,6 +337,32 @@ func _place_items(k: int, first_key: int, last_key: int, rng: RandomNumberGenera
 					continue
 				props.append({"x": px, "kind": prop_kind, "island": k, "s": rng.randf_range(0.8, 1.3)})
 		i += 1
+
+
+## Adds a coin unless it would sit inside a bay's wave (coins must never lure the bird into it).
+func _add_coin(p: Vector2) -> void:
+	if not in_wave_shape(p, WAVE_COIN_PAD):
+		coins.add_item(p, CoinField.COIN)
+
+
+## True when p is inside (or within `pad` of) the full-height wave over any bay.
+func in_wave_shape(p: Vector2, pad: float) -> bool:
+	if p.y > Wave.TUBE_TOP + pad or p.y < Wave.CREST_Y - pad:
+		return false
+	for b in bays:
+		var x0 := float(b.water_x0) - Wave.COL_PAD
+		var x1 := float(b.water_x1) + Wave.COL_PAD
+		var y := clampf(p.y, Wave.CREST_Y, Wave.TUBE_TOP - 1.0)
+		if p.x > Wave.face_x(x0, y, Wave.CREST_Y) - pad and p.x < Wave.back_x(x0, x1, y, Wave.CREST_Y) + pad:
+			return true
+	return false
+
+
+func _bay_with_lip(x: float) -> int:
+	for i in bays.size():
+		if absf(float(bays[i].lip_x) - x) < 0.5:
+			return i
+	return -1
 
 
 func _is_kite_x(x: float) -> bool:
@@ -439,16 +463,6 @@ class PropsLayer:
 		if terrain == null:
 			return
 		var t := Time.get_ticks_msec() / 1000.0
-		for bay in terrain.bays:
-			var lx: float = bay.lip_x
-			if lx < view_left - 400.0 or lx > view_right + 400.0:
-				continue
-			var surf := PackedVector2Array()
-			var sx := lx - 220.0
-			while sx <= lx + KICK_AFTER:
-				surf.append(Vector2(sx, terrain.height_at(sx)))
-				sx += 14.0
-			Art.launch_ramp(self, surf, LIP_COLOR, LIP_EDGE, t)
 		for p in terrain.props:
 			var x: float = p.x
 			if x < view_left - 300.0 or x > view_right + 300.0:
