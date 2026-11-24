@@ -17,6 +17,7 @@ var autoplay := false
 var running := true
 var start_island := 0
 var run_seed := 1
+var level: Dictionary = {}  # adventure level (Levels.all() entry); empty = endless run
 var sun_progress := 1.0     # 1 = high sun, 0 = sunset
 var shake := 0.0
 var bird_screen_x := 0.3   # where the bird sits horizontally on screen (0..1)
@@ -31,6 +32,7 @@ var current_island := 0
 var input_enabled := true
 var hazards := true        # false in menu / shop demo worlds: the sea just bounces the bird
 var dead := false
+var finished := false      # adventure level past its gate: nothing can kill the bird any more
 var monster: SeaMonster
 var wave: Wave
 var kite: Kite
@@ -54,6 +56,9 @@ var _ai_react := -1.0
 
 
 func _ready() -> void:
+	if not level.is_empty():
+		run_seed = int(level.seed)
+		start_island = int(level.island)
 	if run_seed == 1:
 		run_seed = randi() % 100000 + 2
 	# sky
@@ -81,9 +86,11 @@ func _ready() -> void:
 	terrain = Terrain.new()
 	add_child(terrain)
 	add_child(coins)
-	terrain.setup(run_seed, start_island, coins)
+	terrain.setup(run_seed, start_island, coins, level)
 	bird = Bird.new()
 	bird.terrain = terrain
+	if not level.is_empty():
+		bird.speed_scale = float(Levels.tier_of(level).speed)
 	bird.position = Vector2(-880, terrain.height_at(-880))
 	add_child(bird)
 	monster = SeaMonster.new()
@@ -119,6 +126,8 @@ func _ready() -> void:
 	bird.skimmed.connect(func(d: float): bird_skimmed.emit(d))
 
 	_biome_to = Biomes.get_biome(start_island)
+	if not level.is_empty() and Levels.tier_of(level).storm:
+		_biome_to = storm_biome(_biome_to)
 	_biome_from = _biome_to
 	backdrop.biome_a = _biome_to
 	backdrop.biome_b = _biome_to
@@ -156,6 +165,15 @@ func _past_island_hazards(x: float) -> float:
 			break
 		x = nx
 	return x
+
+
+## A Badai copy of a biome: rain and a darker tint.
+static func storm_biome(b: Dictionary) -> Dictionary:
+	var s := b.duplicate()
+	s.ambient = "rain"
+	s.ambient_color = Color("#d8f0ff")
+	s.tint = (b.tint as Color).darkened(0.18)
+	return s
 
 
 func current_biome() -> Dictionary:
@@ -208,7 +226,7 @@ func _update_hazards(delta: float) -> void:
 			hit_island = h.CAUSE
 	var over_water := terrain.is_water_at(x)
 	var over_sea := terrain.is_sea_at(x)
-	if not hazards:
+	if not hazards or finished:
 		if over_water and bird.position.y > Terrain.WATER_Y - 30.0:
 			bird.vel.y = -Bird.MAX_RISE
 			bird.on_ground = false

@@ -5,6 +5,10 @@ const SUN_PROGRESS := 0.8      # fixed sun height: the sky no longer counts down
 const SIM_MAX := 240.0          # --sim runs end after this many seconds (cause "batas")
 const HIGH_FLIGHT := 520.0     # px above ground/water for "TERBANG TINGGI!"
 const WAVE_POINTS := 150        # style points for clearing a beach wave
+const STAR_BONUS := 20          # coins per newly earned level star
+const COIN_STAR_RATIO := 0.6    # level star 2: collect at least this share of the level's coins
+const MAIN_MENU := "res://scenes/main_menu.tscn"
+const LEVEL_MAP := "res://scenes/level_map.tscn"
 const CAUSE_TITLES := {"laut": "Tercebur ke laut!", "monster": "Digigit monster laut!", "ombak": "Terkena ombak", "layangan": "Tersangkut layangan!", "hutan": "Tersangkut di hutan!", "batas": "Simulasi selesai"}
 const CAUSE_TIPS := {
 	"laut": "Tahan untuk naik sebelum stamina habis di atas laut",
@@ -23,7 +27,10 @@ const HAZARD_PASS := {
 }
 
 var world: World
-var state := "ready"       # ready → play → over
+var state := "ready"       # ready → play → over (lost) | done (adventure level finished)
+var level: Dictionary = {}  # adventure level (Levels entry); empty = endless run
+var level_coins_total := 0  # coin items before the level's gate
+var level_coins := 0        # of those, collected this run
 var run_time := 0.0
 var distance := 0
 var style_points := 0
@@ -59,11 +66,18 @@ func _ready() -> void:
 	world = World.new()
 	world.start_island = Game.dev_int("island", 0)
 	world.run_seed = Game.dev_int("seed", 1)   # 1 = random (see World._ready)
+	if Game.current_level != "":
+		level = Levels.get_level(Game.current_level)
+		world.level = level
 	world.running = false
 	world.sun_progress = SUN_PROGRESS
 	world.autoplay = Game.dev.has("autoplay")
 	add_child(world)
 	start_x = world.bird.position.x
+	if not level.is_empty():
+		for it in world.coins.items:
+			if (it[0] as Vector2).x < world.terrain.island_finish[0]:
+				level_coins_total += 1
 	world.island_reached.connect(_on_island)
 	world.item_collected.connect(_on_item)
 	world.bird_landed.connect(_on_landed)
@@ -121,6 +135,9 @@ func _physics_process(delta: float) -> void:
 			if fever_t <= 0.0:
 				world.bird.fever = false
 				fever_lbl.hide()
+		if not level.is_empty() and world.bird.position.x >= world.terrain.island_finish[0]:
+			_finish_level()
+			return
 		coin_chain_t -= delta
 		if coin_chain_t <= 0.0:
 			coin_chain = 0
@@ -134,7 +151,10 @@ func _process(_delta: float) -> void:
 	stamina_bar.value = world.bird.stamina
 	stamina_bar.exhausted = world.bird.exhausted
 	lbl_score.text = _fmt(score())
-	(coin_pill.get_node("H/Label") as Label).text = str(coins_run)
+	var coin_text := str(coins_run)
+	if not level.is_empty():
+		coin_text = "%d/%d" % [level_coins, level_coins_total]
+	(coin_pill.get_node("H/Label") as Label).text = coin_text
 	if fever_lbl.visible:
 		fever_lbl.scale = Vector2.ONE * (1.0 + 0.06 * sin(Time.get_ticks_msec() * 0.02))
 
@@ -152,13 +172,41 @@ func _finish(cause: String) -> void:
 	var earned := coins_run - coins_banked
 	coins_banked = coins_run
 	Game.add_coins(earned)
-	var record := Game.submit_run(score(), distance, world.current_island + 1)
+	var record := false
+	if level.is_empty():
+		record = Game.submit_run(score(), distance, world.current_island + 1)
 	lbl_hint.hide()
 	if Game.dev.has("autoplay"):
 		print("RUN score=%d dist=%d islands=%d coins=%d best_skim=%d cause=%s" % [score(), distance, world.current_island + 1, coins_run, best_skim, cause])
 		if Game.dev.has("sim"):
 			get_tree().quit()
 	_show_results(record)
+
+
+## Stars for this run: 1 for reaching the gate, 1 for enough coins, 1 for not using "Lanjut".
+func level_stars_earned() -> int:
+	var need := ceili(COIN_STAR_RATIO * level_coins_total)
+	return 1 + (1 if level_coins >= need else 0) + (0 if continued else 1)
+
+
+## The bird passed the level's gate: bank coins + new-star bonus and show "Level selesai!".
+func _finish_level() -> void:
+	if state == "done" or state == "over":
+		return
+	state = "done"
+	world.finished = true
+	var stars := level_stars_earned()
+	var new_stars := Game.record_level(String(level.id), stars)
+	var bonus := new_stars * STAR_BONUS
+	var earned := coins_run - coins_banked
+	coins_banked = coins_run
+	Game.add_coins(earned + bonus)
+	lbl_hint.hide()
+	if Game.dev.has("autoplay"):
+		print("RUN level=%s stars=%d coins=%d/%d run_coins=%d dist=%d cause=selesai" % [level.id, stars, level_coins, level_coins_total, coins_run, distance])
+		if Game.dev.has("sim"):
+			get_tree().quit()
+	_show_level_done(stars, new_stars, earned, bonus)
 
 
 func _continue_run() -> void:
@@ -185,6 +233,8 @@ func _continue_run() -> void:
 # ================================================================ events
 
 func _on_island(k: int, biome: Dictionary) -> void:
+	if not level.is_empty():
+		return   # a level ends at its gate: no island bonus, no banner
 	style_points += 500
 	coins_run += 20
 	Sfx.play("island")
@@ -194,7 +244,9 @@ func _on_island(k: int, biome: Dictionary) -> void:
 		_popup("Awas ombak raksasa!", "Terbang rendah lewat gulungannya", Color("#7ff0e6"))
 
 
-func _on_item(_kind: int, _pos: Vector2) -> void:
+func _on_item(_kind: int, pos: Vector2) -> void:
+	if not level.is_empty() and pos.x < world.terrain.island_finish[0]:
+		level_coins += 1
 	coins_run += 2 if world.bird.fever else 1
 	coin_chain += 1
 	coin_chain_t = 0.6
@@ -364,7 +416,7 @@ func _build_hud() -> void:
 	ready_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	ready_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var b := world.current_biome()
-	var l1 := UIKit.label(String(b.name).to_upper(), 64, Color.WHITE, true, 14)
+	var l1 := UIKit.label((String(level.name) if not level.is_empty() else String(b.name)).to_upper(), 64, Color.WHITE, true, 14)
 	l1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ready_box.add_child(l1)
 	var l2 := UIKit.label("Tahan untuk naik", 32, Color("#fff3c4"), false, 10)
@@ -398,6 +450,9 @@ func _coin_pill(text: String) -> PanelContainer:
 
 
 func _set_island_label(k: int, b: Dictionary) -> void:
+	if not level.is_empty():
+		lbl_island.text = "Level %d  •  %s" % [Levels.index_of(String(level.id)) + 1, level.name]
+		return
 	lbl_island.text = "Pulau %d  •  %s" % [k + 1, b.name]
 
 
@@ -454,7 +509,7 @@ func _show_banner(k: int, b: Dictionary) -> void:
 # ================================================================ pause
 
 func _toggle_pause() -> void:
-	if state == "over" or state == "ready":
+	if state != "play":
 		return
 	if pause_panel:
 		pause_panel.queue_free()
@@ -550,6 +605,11 @@ func _show_results(record: bool) -> void:
 	var counter := create_tween()
 	counter.tween_method(func(x: float): big.text = _fmt(int(x)), 0.0, float(final_score), 1.1).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 
+	var rows := [["Jarak", "%s m" % _fmt(distance)], ["Pulau dicapai", str(world.current_island + 1)],
+			["Nyerempet beruntun", str(best_skim)], ["Koin didapat", "+%d" % coins_run], ["Rekor", _fmt(Game.best_score)]]
+	if not level.is_empty():
+		rows = [["Level", String(level.name)], ["Koin level", "%d/%d" % [level_coins, level_coins_total]],
+				["Nyerempet beruntun", str(best_skim)], ["Koin didapat", "+%d" % coins_run]]
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 40)
@@ -557,8 +617,7 @@ func _show_results(record: bool) -> void:
 	var gc := CenterContainer.new()
 	gc.add_child(grid)
 	v.add_child(gc)
-	for row in [["Jarak", "%s m" % _fmt(distance)], ["Pulau dicapai", str(world.current_island + 1)],
-			["Nyerempet beruntun", str(best_skim)], ["Koin didapat", "+%d" % coins_run], ["Rekor", _fmt(Game.best_score)]]:
+	for row in rows:
 		grid.add_child(UIKit.label(row[0], 24, Color(1, 1, 1, 0.7)))
 		var val := UIKit.label(row[1], 24, Color.WHITE, true)
 		val.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -576,16 +635,87 @@ func _show_results(record: bool) -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
 	v.add_child(row)
-	var again := UIKit.button("Main Lagi", UIKit.SKY, UIKit.SKY_DARK, 30)
+	var again := UIKit.button("Main Lagi" if level.is_empty() else "Ulangi", UIKit.SKY, UIKit.SKY_DARK, 30)
 	again.name = "MainLagi"
 	again.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	again.pressed.connect(func(): Ads.on_run_finished(); Game.goto("res://scenes/game.tscn"))
+	again.pressed.connect(func(): Ads.on_run_finished(); _goto_level(String(level.get("id", ""))))
 	row.add_child(again)
-	var menu := UIKit.button("Menu", UIKit.PLUM, UIKit.PLUM_DARK, 30)
+	var menu := UIKit.button("Menu" if level.is_empty() else "Peta", UIKit.PLUM, UIKit.PLUM_DARK, 30)
 	menu.name = "Menu"
 	menu.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	menu.pressed.connect(func(): Ads.on_run_finished(); Game.goto("res://scenes/main_menu.tscn"))
+	menu.pressed.connect(func(): Ads.on_run_finished(); Game.goto(MAIN_MENU if level.is_empty() else LEVEL_MAP))
 	row.add_child(menu)
+
+
+## Starts a run of the given level ("" = endless).
+func _goto_level(id: String) -> void:
+	Game.current_level = id
+	Game.goto("res://scenes/game.tscn")
+
+
+func _show_level_done(stars: int, new_stars: int, earned: int, bonus: int) -> void:
+	result_panel = _overlay()
+	result_panel.modulate.a = 0.0
+	var fade := create_tween()
+	fade.tween_interval(0.8)   # let the bird glide past the gate first
+	fade.tween_property(result_panel, "modulate:a", 1.0, 0.4)
+	var p := UIKit.panel(Color(0.12, 0.08, 0.24, 0.9), 34)
+	p.custom_minimum_size = Vector2(620, 0)
+	_center(result_panel, p)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 10)
+	p.add_child(v)
+	var title := UIKit.label("Level selesai!", 48, Color("#ffe066"), true)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(title)
+	var name_l := UIKit.label(String(level.name), 26, Color(1, 1, 1, 0.85))
+	name_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(name_l)
+	var row_s := StarRow.new()
+	row_s.custom_minimum_size = Vector2(0, 110)
+	row_s.total = stars
+	v.add_child(row_s)
+	var st := create_tween()
+	st.tween_interval(1.2)
+	for i in stars:
+		st.tween_callback(func(): row_s.shown = i + 1; row_s.queue_redraw(); Sfx.play("perfect", 1.0 + 0.12 * i))
+		st.tween_interval(0.3)
+	var info := "Koin +%d" % earned
+	if new_stars > 0:
+		info += "   •   Bintang baru +%d koin" % bonus
+	var il := UIKit.label(info, 24, Color.WHITE, true)
+	il.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(il)
+	var hint := ""
+	if level_coins < ceili(COIN_STAR_RATIO * level_coins_total):
+		hint = "Kumpulkan %d koin untuk dapat bintang lagi" % ceili(COIN_STAR_RATIO * level_coins_total)
+	elif continued:
+		hint = "Selesaikan tanpa Lanjut untuk dapat bintang lagi"
+	if hint != "":
+		var hl := UIKit.label(hint, 22, Color(1, 1, 1, 0.75))
+		hl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		v.add_child(hl)
+	# three buttons: Lanjut (next level), Ulangi, Peta
+	var i_next := Levels.index_of(String(level.id)) + 1
+	var next_id := ""
+	if i_next < Levels.all().size():
+		next_id = String(Levels.all()[i_next].id)
+	var nxt := UIKit.button("Lanjut", UIKit.LEAF, UIKit.LEAF_DARK, 30)
+	nxt.name = "Lanjut"
+	nxt.disabled = next_id == "" or not Game.is_unlocked(next_id)
+	nxt.pressed.connect(func(): Ads.on_run_finished(); _goto_level(next_id))
+	v.add_child(nxt)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	v.add_child(row)
+	var again := UIKit.button("Ulangi", UIKit.SKY, UIKit.SKY_DARK, 28)
+	again.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	again.pressed.connect(func(): Ads.on_run_finished(); _goto_level(String(level.id)))
+	row.add_child(again)
+	var map := UIKit.button("Peta", UIKit.PLUM, UIKit.PLUM_DARK, 28)
+	map.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	map.pressed.connect(func(): Ads.on_run_finished(); Game.goto(LEVEL_MAP))
+	row.add_child(map)
 
 
 func _on_continue_reward(ok: bool) -> void:
@@ -600,6 +730,20 @@ static func _fmt(n: int) -> String:
 		out = "." + s.substr(s.length() - 3) + out
 		s = s.substr(0, s.length() - 3)
 	return s + out
+
+
+# ================================================================ level stars
+
+class StarRow:
+	extends Control
+	var total := 0      # stars earned this run
+	var shown := 0      # how many have popped in so far
+
+	func _draw() -> void:
+		var c := size * 0.5
+		for i in 3:
+			var p := c + Vector2((i - 1) * 96.0, 6.0 if i != 1 else -6.0)
+			Art.level_star(self, p, 40.0 if i == 1 else 34.0, i < shown and i < total)
 
 
 # ================================================================ stamina bar

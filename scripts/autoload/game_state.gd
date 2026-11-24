@@ -22,6 +22,9 @@ var ads_removed: bool = false
 var tutorial_done: bool = false
 var last_daily: String = ""
 var daily_streak: int = 0
+var level_stars: Dictionary = {}   # adventure level id -> best stars (0..3)
+## Adventure level being played ("" = endless run). Set by the level map or `--level=<id>`.
+var current_level: String = ""
 
 ## Dev / test flags parsed from command line (after `--`).
 var dev := {}
@@ -34,6 +37,8 @@ var _busy := false
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_parse_args()
+	if dev.has("level"):
+		current_level = str(dev["level"])
 	_setup_input()
 	load_game()
 	_build_fade()
@@ -101,6 +106,41 @@ func submit_run(score: int, distance: int, island: int) -> bool:
 	return is_record
 
 
+# ---------------------------------------------------------------- adventure levels
+
+## Stores the best result for a level; returns how many stars are new (for the star bonus).
+func record_level(id: String, stars: int) -> int:
+	var old := int(level_stars.get(id, 0))
+	if stars > old:
+		level_stars[id] = stars
+		save_game()
+		return stars - old
+	return 0
+
+
+## A level is open when its island is ready and it is the first level or the one before has a star.
+func is_unlocked(id: String) -> bool:
+	var i := Levels.index_of(id)
+	if i < 0 or not Levels.is_ready(Levels.all()[i]):
+		return false
+	return i == 0 or int(level_stars.get(Levels.all()[i - 1].id, 0)) >= 1
+
+
+func total_stars() -> int:
+	var n := 0
+	for v in level_stars.values():
+		n += int(v)
+	return n
+
+
+func last_unlocked_index() -> int:
+	var last := 0
+	for i in Levels.all().size():
+		if is_unlocked(Levels.all()[i].id):
+			last = i
+	return last
+
+
 # ---------------------------------------------------------------- daily reward
 
 func _today() -> String:
@@ -158,16 +198,20 @@ func toggle_music() -> void:
 func save_game() -> void:
 	if dev.has("nosave"):   # tests / balance sims must not touch the player's save
 		return
-	var data := {
+	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	if f:
+		f.store_string(JSON.stringify(save_data()))
+
+
+func save_data() -> Dictionary:
+	return {
 		"coins": coins, "best_score": best_score, "best_distance": best_distance,
 		"best_island": best_island, "total_runs": total_runs,
 		"owned_skins": owned_skins, "equipped_skin": equipped_skin,
 		"sound_on": sound_on, "music_on": music_on, "ads_removed": ads_removed,
 		"tutorial_done": tutorial_done, "last_daily": last_daily, "daily_streak": daily_streak,
+		"level_stars": level_stars,
 	}
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-	if f:
-		f.store_string(JSON.stringify(data))
 
 
 func load_game() -> void:
@@ -181,6 +225,11 @@ func load_game() -> void:
 	var parsed = JSON.parse_string(f.get_as_text())
 	if typeof(parsed) != TYPE_DICTIONARY:
 		return
+	apply_save(parsed)
+
+
+## Applies saved data; keys missing from older saves keep their defaults.
+func apply_save(parsed: Dictionary) -> void:
 	coins = int(parsed.get("coins", 0))
 	best_score = int(parsed.get("best_score", 0))
 	best_distance = int(parsed.get("best_distance", 0))
@@ -194,6 +243,11 @@ func load_game() -> void:
 	tutorial_done = bool(parsed.get("tutorial_done", false))
 	last_daily = str(parsed.get("last_daily", ""))
 	daily_streak = int(parsed.get("daily_streak", 0))
+	level_stars = {}
+	var ls = parsed.get("level_stars", {})
+	if typeof(ls) == TYPE_DICTIONARY:
+		for k in ls:
+			level_stars[str(k)] = int(ls[k])
 	if dev.has("coins"):
 		coins = int(dev["coins"])
 
