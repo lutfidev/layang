@@ -57,13 +57,18 @@ func _build_ui() -> void:
 	var tag := UIKit.label("Terbang tanpa batas melintasi Nusantara", 28, Color.WHITE, false, 8)
 	col.add_child(tag)
 	var gap := Control.new()
-	gap.custom_minimum_size = Vector2(0, 18)
+	gap.custom_minimum_size = Vector2(0, 4)
 	col.add_child(gap)
 
-	var play := UIKit.button("MAIN", UIKit.LEAF, UIKit.LEAF_DARK, 46, 380)
-	play.custom_minimum_size.y = 92
-	play.pressed.connect(func(): Game.goto("res://scenes/game.tscn"))
+	var play := UIKit.button("Petualangan", UIKit.LEAF, UIKit.LEAF_DARK, 42, 380)
+	play.custom_minimum_size.y = 86
+	play.pressed.connect(func(): Game.goto("res://scenes/level_map.tscn"))
 	col.add_child(play)
+	var endless := UIKit.button("Tanpa Batas", UIKit.SKY, UIKit.SKY_DARK, 30, 380)
+	endless.pressed.connect(func():
+		Game.current_level = ""
+		Game.goto("res://scenes/game.tscn"))
+	col.add_child(endless)
 	var shop := UIKit.button("Toko Burung", UIKit.SUN, UIKit.SUN_DARK, 30, 380)
 	shop.pressed.connect(func(): Game.goto("res://scenes/shop.tscn"))
 	col.add_child(shop)

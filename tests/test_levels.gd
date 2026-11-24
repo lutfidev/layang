@@ -332,3 +332,68 @@ func test_hud_level_coins() -> String:
 		return "only %d level coins" % g.level_coins_total
 	var got: String = (g.coin_pill.get_node("H/Label") as Label).text
 	return "" if got == want else "coin label %s, want %s" % [got, want]
+
+
+# ---------------------------------------------------------------- map + menu (Task 4)
+
+func _scene(path: String) -> Node:
+	var n: Node = load(path).instantiate()
+	runner.add_child(n)
+	return n
+
+
+func _free_node(n: Node) -> void:
+	runner.remove_child(n)
+	n.free()
+
+
+func _count_text(n: Node, text: String) -> int:
+	var c := 1 if (n is Label and (n as Label).text == text) else 0
+	for ch in n.get_children():
+		c += _count_text(ch, text)
+	return c
+
+
+func test_map_buttons() -> String:
+	var keep: Dictionary = Game.level_stars.duplicate()
+	Game.level_stars = {"sawah-1": 2}
+	var m := _scene("res://scenes/level_map.tscn")
+	var r := ""
+	var btns: Array = m.level_buttons
+	if btns.size() != 18:
+		r = "%d level buttons" % btns.size()
+	else:
+		for i in 18:
+			var b: Button = btns[i]
+			var id: String = Levels.all()[i].id
+			if b.text != str(i + 1):
+				r = "button %d text %s" % [i, b.text]
+				break
+			if b.disabled == Game.is_unlocked(id):
+				r = "button %d (%s) disabled=%s" % [i, id, b.disabled]
+				break
+		if r == "" and m.scroll_target_index() != 1:
+			r = "scroll target %d" % m.scroll_target_index()
+		if r == "" and not _has_text(m, "Bintang 2/54"):
+			r = "no star total"
+	_free_node(m)
+	Game.level_stars = keep
+	return r
+
+
+func test_map_coming_soon() -> String:
+	var m := _scene("res://scenes/level_map.tscn")
+	var n := _count_text(m, "Segera hadir")
+	_free_node(m)
+	return "" if n == 3 else "%d 'Segera hadir' labels" % n
+
+
+func test_menu_two_modes() -> String:
+	var m := _scene("res://scenes/main_menu.tscn")
+	var r := ""
+	if not _has_text(m, "Petualangan") or not _has_text(m, "Tanpa Batas"):
+		r = "missing mode buttons"
+	elif _has_text(m, "MAIN"):
+		r = "old MAIN button still there"
+	_free_node(m)
+	return r
