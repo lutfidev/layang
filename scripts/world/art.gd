@@ -327,3 +327,41 @@ static func wave(ci: CanvasItem, mid: float, half_w: float, water_y: float, h: f
 	for i in 6:
 		var u := fmod(t * 0.8 + i / 6.0, 1.0)
 		ci.draw_circle(Vector2(mid - half_w * 0.9 + u * half_w * 0.2, water_y - u * 30.0), 5.0 * (1.0 - u), Color(1, 1, 1, 0.8 * (1.0 - u)))
+
+
+static func kite(ci: CanvasItem, c: Vector2, hw: float, hh: float, col: Color, accent: Color) -> void:
+	# Layangan: a diamond with two-tone halves and its cross sticks.
+	var top := c + Vector2(0, -hh)
+	var bottom := c + Vector2(0, hh)
+	var left := c + Vector2(-hw, -hh * 0.2)
+	var right := c + Vector2(hw, -hh * 0.2)
+	ci.draw_colored_polygon(PackedVector2Array([top, left, bottom]), col)
+	ci.draw_colored_polygon(PackedVector2Array([top, right, bottom]), col.lightened(0.18))
+	ci.draw_colored_polygon(PackedVector2Array([top, c + Vector2(-hw * 0.45, -hh * 0.5), c + Vector2(0, -hh * 0.2), c + Vector2(hw * 0.45, -hh * 0.5)]), accent)
+	ci.draw_line(top, bottom, col.darkened(0.45), 2.0, true)
+	ci.draw_line(left, right, col.darkened(0.45), 2.0, true)
+	ci.draw_polyline(PackedVector2Array([top, right, bottom, left, top]), col.darkened(0.3), 2.0, true)
+
+
+static func kite_tail(ci: CanvasItem, pts: PackedVector2Array, col: Color) -> void:
+	# the deadly part: a dark cord with big bows so it reads from a screen away
+	ci.draw_polyline(pts, col.darkened(0.55), 3.0, true)
+	for i in range(1, pts.size()):
+		var p := pts[i]
+		var bow := col if i % 2 == 0 else col.darkened(0.25)
+		ci.draw_colored_polygon(PackedVector2Array([p + Vector2(-12, -7), p, p + Vector2(-12, 7)]), bow)
+		ci.draw_colored_polygon(PackedVector2Array([p + Vector2(12, -7), p, p + Vector2(12, 7)]), bow)
+		ci.draw_circle(p, 2.5, col.darkened(0.55))
+
+
+## A villager flying a kite; returns the hand position (where the string starts).
+static func villager(ci: CanvasItem, base: Vector2, s: float, col: Color) -> Vector2:
+	ci.draw_line(base + Vector2(-5, 0) * s, base + Vector2(-2, -20) * s, col, 4.0 * s, true)
+	ci.draw_line(base + Vector2(5, 0) * s, base + Vector2(2, -20) * s, col, 4.0 * s, true)
+	ci.draw_line(base + Vector2(0, -20) * s, base + Vector2(0, -40) * s, col, 6.0 * s, true)
+	var hand := base + Vector2(12, -46) * s
+	ci.draw_line(base + Vector2(0, -36) * s, hand, col, 3.5 * s, true)
+	ci.draw_circle(base + Vector2(0, -47) * s, 6.0 * s, col)
+	# caping (conical farmer's hat)
+	ci.draw_colored_polygon(PackedVector2Array([base + Vector2(-14, -49) * s, base + Vector2(0, -60) * s, base + Vector2(14, -49) * s]), Color("#e8c46a"))
+	return hand

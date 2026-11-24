@@ -1,6 +1,6 @@
 # Layang Tanpa Batas — design
 
-Status: disetujui (tahap 1 selesai, PR #2; tahap 2 di `feat/tanpa-timer`) · 2026-11-24 · lanjutan dari `2026-11-24-tahan-naik-design.md`
+Status: disetujui (tahap 1 selesai, PR #2; tahap 2 selesai, PR #3; tahap 3 selesai di `feat/layangan-sawah`) · 2026-11-24 · lanjutan dari `2026-11-24-tahan-naik-design.md`
 
 ## Intent (kenapa)
 
@@ -152,6 +152,67 @@ Pemain memilih A (2026-11-24).
 - Tes: layar kalah punya tepat tiga tombol bernama Main Lagi, Menu, Lanjut; setelah lanjut sekali, tombol Lanjut nonaktif.
 - Tes: lanjut setelah mati di laut dan di teluk menempatkan burung di atas tanah kering dan skor tidak turun.
 - Sim `--sim` selesai dengan `RUN score=…`.
+
+## Tahap 3 — Layang-layang warga di sawah (detail)
+
+### Yang diputuskan bersama
+- **Yang mematikan: badan layangan dan ekornya.** Tali dari tangan warga hanya hiasan dan bisa ditembus
+  (boleh bergoyang sedikit saat burung lewat). Alasannya: kalau tali ikut mematikan, jalur bawah tidak lagi aman.
+- **Cara membangun: node `Kite` sendiri, meniru pola ombak** (lihat Approaches di bawah).
+
+### Approaches
+- **A. Node `Kite` sendiri seperti `Wave` (dipilih).** `terrain` mencatat posisi layangan, `Kite` menggambar dan
+  mengecek tabrakan, `world._update_hazards` memanggilnya. Polanya sama dengan ombak dan mudah dites headless.
+- B. Sistem rintangan umum untuk ombak/layangan/monster. Lebih rapi, tapi merombak dua rintangan yang sudah
+  teruji demi satu yang baru. Kalau perlu, dipertimbangkan di tahap 5.
+- C. Layangan sebagai prop di `PropsLayer` plus cek tabrakan. Paling sedikit kode, tapi prop hanya hiasan tanah;
+  animasi ekor dan tabrakan tidak cocok di sana dan sulit dites.
+
+### Keputusan saya (bisa dikoreksi)
+- **Tempat:** hanya di pulau biome `sawah`, **2 layangan per pulau**, di puncak bukit yang dipilih dengan RNG
+  terpisah (seperti `pick_bay_hills`): tidak di 2 bukit pertama, tidak berurutan. `terrain.kites` diurutkan
+  menurut x: `{x, peak_y, island}`, dengan `x` = x puncak.
+- **Bentuk tetap dan terbaca dari jauh:** layangan **tidak berpindah**. Badan (belah ketupat ±34×44 px) bergoyang
+  pelan ±8 px. Ekor (8–10 pita) tergantung dari badan ke bawah, berkibar **hanya ke samping** (±20 px), jadi ujung
+  bawahnya selalu di ketinggian yang sama. Celah aman di bawahnya tidak pernah berubah.
+- **Ukuran awal (disetel lewat tes):** badan di sekitar `peak_y − 400`, ujung ekor **≥ 170 px di atas tanah** di
+  seluruh lebar ekor. Burung yang terbang menyusuri bukit (autopilot ±70 px, `SKIM_HEIGHT` 90) lewat di bawahnya.
+  Jalur atas lewat di atas badan (masih jauh di bawah `CEILING_SOFT`).
+- **Tabrakan memaafkan:** badan pakai jarak ke belah ketupat + `RADIUS`; ekor pakai jarak ke ruas-ruas polylinenya
+  < 10 px + ukuran kecil burung. Lebih kecil dari gambarnya supaya serempetan terasa "hampir kena!", bukan kalah.
+- **Pilihan koin:** di setiap layangan, busur koin biasa di puncak itu diganti **busur 10 koin** yang melengkung
+  di atas badan layangan (jalur atas berisiko, hadiah lebih besar). Jalur bawah **tidak** dapat koin tambahan
+  (aman tapi sedikit). Busur acak biasa tidak boleh ditaruh di dekat layangan.
+- **Warga:** berdiri di lereng naik sebelum puncak, memegang tali yang naik miring ke badan layangan. Digambar
+  sebagai `Art.*` (tanpa aset).
+- **Tanda awal:** layangan pertama di run memunculkan popup "Awas layangan!" / "Terbang rendah di bawah ekornya"
+  (seperti "Awas ombak!"). Layangan sudah terlihat sejak satu layar sebelumnya karena diam di tempat.
+- **Kalah:** penyebab `"layangan"`, judul **"Tersangkut layangan!"**, saran
+  **"Terbang rendah di bawah ekor, atau tinggi di atasnya"**. Getar layar dan percikan kertas warna-warni.
+- **Lanjut:** kematian ini terjadi di atas darat. Burung dipindah maju ke
+  `maxf(dry_ground_after(x), ujung_kanan_layangan + 200)`, aturan lain sama seperti tahap 2 (skor tidak turun).
+- **Dunia menu/toko (`hazards = false`):** layangan tetap digambar, tidak mematikan. Autopilot (menyusuri ±70 px)
+  sudah lewat di bawah ekor, jadi tidak perlu logika baru. Sim tetap mencapai batas 240 dtk.
+- **Di luar tahap ini:** layangan di pulau lain, layangan yang bergerak, dan dua layangan berdekatan (tahap 5).
+
+### Angka akhir tahap 3
+- `Terrain`: 2 layangan per pulau Sawah (`pick_hills`, RNG `run_seed * 4271 + k * 65537`), `x` = x puncak bukit.
+  Busur 10 koin: `x ± 300`, puncak busur `peak_y − 520`, ujungnya 120 px lebih rendah.
+- `Kite`: badan di `peak_y − 400` (±34×44, goyang ±8), ekor 10 ruas ke ujung `(x − 40, peak_y − 170)`, kibar ±20 px
+  ke samping; radius tabrakan burung 16 px (lebih kecil dari `Bird.RADIUS` 22). Popup muncul 1400 px sebelum layangan
+  pertama. Warga berdiri 360 px sebelum puncak.
+- Ekor digambar dengan warna utama layangan (bukan warna aksen) supaya terbaca di langit terang.
+- Sim seed 11 dan 4242: `cause=batas` (skor ≈21.240/21.390), autopilot tidak pernah tersangkut.
+
+### Bukti selesai (tahap 3)
+- Tes: untuk beberapa seed, setiap pulau Sawah punya tepat 2 layangan, tidak di 2 bukit pertama, tidak berurutan;
+  ujung ekor ≥ 170 px di atas tanah di seluruh lebar ekor.
+- Tes headless: burung yang menyusuri bukit lewat di bawah setiap layangan tanpa kalah; burung yang melintas setinggi
+  badan layangan kalah dengan `bird_died("layangan")`; burung yang lewat di atas badan selamat.
+- Tes: judul layar kalah "Tersangkut layangan!"; lanjut menempatkan burung di depan layangan dan skor tidak turun.
+- Tes: dunia `hazards = false` tidak pernah mati karena layangan.
+- Sim `--sim` (seed 11 dan 4242) tetap `cause=batas`. Screenshot pulau Sawah memperlihatkan layangan, warga, tali,
+  dan busur koin.
 
 ## Constraints
 

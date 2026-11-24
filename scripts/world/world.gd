@@ -7,7 +7,7 @@ signal island_reached(k: int, biome: Dictionary)
 signal item_collected(kind: int, pos: Vector2)
 signal bird_landed(bonk: bool)
 signal bird_splashed
-signal bird_died(cause: String)        # "laut" | "monster" | "ombak"
+signal bird_died(cause: String)        # "laut" | "monster" | "ombak" | "layangan"
 signal wave_passed
 signal bird_skimmed(duration: float)
 
@@ -31,6 +31,7 @@ var hazards := true        # false in menu / shop demo worlds: the sea just boun
 var dead := false
 var monster: SeaMonster
 var wave: Wave
+var kite: Kite
 
 var _sky_mat: ShaderMaterial
 var _sky_rect: ColorRect
@@ -87,6 +88,9 @@ func _ready() -> void:
 	wave.terrain = terrain
 	wave.sounds = hazards
 	add_child(wave)
+	kite = Kite.new()
+	kite.terrain = terrain
+	add_child(kite)
 	wave.passed.connect(func():
 		if not dead:
 			wave_passed.emit())
@@ -163,6 +167,7 @@ func _physics_process(delta: float) -> void:
 func _update_hazards(delta: float) -> void:
 	var x := bird.position.x
 	var hit_wave := wave.update(delta, bird.center(), x)
+	var hit_kite := kite.update(delta, bird.center(), x)
 	var over_water := terrain.is_water_at(x)
 	var over_sea := terrain.is_sea_at(x)
 	if not hazards:
@@ -191,6 +196,8 @@ func _update_hazards(delta: float) -> void:
 		_die("monster")
 	elif hit_wave:
 		_die("ombak")
+	elif hit_kite:
+		_die("layangan")
 	elif over_water and bird.center().y > Terrain.WATER_Y:
 		_die("laut")
 
@@ -205,6 +212,10 @@ func _die(cause: String) -> void:
 		shake = 1.0
 		Sfx.play("splash")
 		Ambient.burst(self, bird.center(), (_biome_to.water_top as Color), 30, 600.0)
+	elif cause == "layangan":
+		shake = 0.8
+		Sfx.play("bonk")
+		Ambient.burst(self, bird.center(), kite.hit_color, 26, 520.0)
 	bird_died.emit(cause)
 
 
@@ -261,6 +272,8 @@ func _process(delta: float) -> void:
 	_update_sky()
 	coins.view_left = camera.position.x - _view_half().x
 	coins.view_right = camera.position.x + _view_half().x
+	kite.view_left = coins.view_left
+	kite.view_right = coins.view_right
 
 
 func _view_half() -> Vector2:

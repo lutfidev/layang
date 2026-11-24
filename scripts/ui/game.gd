@@ -5,11 +5,12 @@ const SUN_PROGRESS := 0.8      # fixed sun height: the sky no longer counts down
 const SIM_MAX := 240.0          # --sim runs end after this many seconds (cause "batas")
 const HIGH_FLIGHT := 520.0     # px above ground/water for "TERBANG TINGGI!"
 const WAVE_POINTS := 150        # style points for clearing a beach wave
-const CAUSE_TITLES := {"laut": "Tercebur ke laut!", "monster": "Digigit monster laut!", "ombak": "Terkena ombak", "batas": "Simulasi selesai"}
+const CAUSE_TITLES := {"laut": "Tercebur ke laut!", "monster": "Digigit monster laut!", "ombak": "Terkena ombak", "layangan": "Tersangkut layangan!", "batas": "Simulasi selesai"}
 const CAUSE_TIPS := {
 	"laut": "Tahan untuk naik sebelum stamina habis di atas laut",
 	"monster": "Lihat tandanya di air, lalu naik tinggi menjauh",
 	"ombak": "Sentuh bibir oranye untuk melompati ombak",
+	"layangan": "Terbang rendah di bawah ekor, atau tinggi di atasnya",
 }
 
 var world: World
@@ -21,7 +22,7 @@ var coins_run := 0
 var coins_banked := 0
 var skim_streak := 0
 var best_skim := 0
-var end_cause := ""         # laut | monster | ombak (batas = sim cap)
+var end_cause := ""         # laut | monster | ombak | layangan (batas = sim cap)
 var _high_awarded := false
 var fever_t := 0.0
 var continued := false
@@ -60,6 +61,7 @@ func _ready() -> void:
 	world.bird_skimmed.connect(_on_skimmed)
 	world.bird_died.connect(_on_died)
 	world.wave_passed.connect(_on_wave_passed)
+	world.kite.spotted.connect(_on_kite_spotted)
 	world.bird_splashed.connect(func(): Sfx.play("splash"))
 	_build_hud()
 	if world.autoplay:
@@ -160,7 +162,7 @@ func _continue_run() -> void:
 	b.exhausted = false
 	b.on_ground = false
 	# respawn safely: forward onto the first gentle dry ground past the water (score never drops)
-	b.position.x = world.terrain.dry_ground_after(b.position.x)
+	b.position.x = world.kite.safe_x_after(world.terrain.dry_ground_after(b.position.x))
 	b.position.y = world.terrain.height_at(b.position.x) - 200.0
 	world.clear_hazards()
 	world.dead = false
@@ -228,6 +230,11 @@ func _on_wave_passed() -> void:
 	style_points += WAVE_POINTS
 	Sfx.play("perfect", 1.2)
 	_popup("LOLOS OMBAK!", "+%d" % WAVE_POINTS, Color("#7ff0e6"))
+
+
+func _on_kite_spotted() -> void:
+	if state == "play":
+		_popup("Awas layangan!", "Terbang rendah di bawah ekornya", Color("#ffd36b"))
 
 
 func _on_died(cause: String) -> void:

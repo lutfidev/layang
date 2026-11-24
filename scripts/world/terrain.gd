@@ -19,6 +19,11 @@ const KICK_BEFORE := 40.0
 const KICK_AFTER := 10.0
 const LIP_COLOR := Color("#ff7a59")
 const LIP_EDGE := Color("#ffe066")
+# Sawah kites: villagers' kites hang over chosen peaks (see Kite); a coin arc runs over each one
+const KITES_PER_ISLAND := 2
+const KITE_ARC_COINS := 10
+const KITE_ARC_HALF := 300.0
+const KITE_ARC_TOP := 520.0                  # arc apex at peak_y - this; its ends sit 120 px lower
 
 var run_seed: int = 1
 var start_island: int = 0
@@ -32,6 +37,8 @@ var island_finish := PackedFloat32Array()   # x of each island's gapura peak
 var props: Array = []                         # [{x, kind, island, s}]
 ## Pantai bays, sorted by x: {lip_x, mid, water_x0, water_x1, bank_x, island}
 var bays: Array = []
+## Sawah kites, sorted by x: {x (= the peak's x), peak_y, island, color}
+var kites: Array = []
 
 var coins: CoinField
 var _islands_generated := 0
@@ -145,13 +152,18 @@ func dry_ground_after(x: float) -> float:
 
 ## Picks BAYS_PER_ISLAND hill indices in [2, hills-1], sorted, never two in a row.
 static func pick_bay_hills(hills: int, rng: RandomNumberGenerator) -> Array[int]:
+	return pick_hills(hills, BAYS_PER_ISLAND, rng)
+
+
+## Picks `count` hill indices in [2, hills-1], sorted, never two in a row.
+static func pick_hills(hills: int, count: int, rng: RandomNumberGenerator) -> Array[int]:
 	var picked: Array[int] = []
-	while picked.size() != BAYS_PER_ISLAND:
+	while picked.size() != count:
 		picked.clear()
 		var pool: Array[int] = []
 		for h in range(2, hills):
 			pool.append(h)
-		while picked.size() < BAYS_PER_ISLAND and not pool.is_empty():
+		while picked.size() < count and not pool.is_empty():
 			var h: int = pool[rng.randi_range(0, pool.size() - 1)]
 			picked.append(h)
 			pool.erase(h)
@@ -231,6 +243,11 @@ func _generate_island() -> void:
 		var bay_rng := RandomNumberGenerator.new()
 		bay_rng.seed = run_seed * 6151 + k * 92821
 		bay_hills = pick_bay_hills(hills, bay_rng)
+	var kite_hills: Array[int] = []
+	if biome.id == "sawah":
+		var kite_rng := RandomNumberGenerator.new()
+		kite_rng.seed = run_seed * 4271 + k * 65537
+		kite_hills = pick_hills(hills, KITES_PER_ISLAND, kite_rng)
 
 	var hill_start_key := keys_x.size() - 1
 	for h in hills:
@@ -246,6 +263,8 @@ func _generate_island() -> void:
 		if h == 0:
 			py = -80.0
 		_add_key(Vector2(px, py), k)
+		if h in kite_hills:
+			kites.append({"x": px, "peak_y": py, "island": k, "color": h % 3})
 
 	# launch ramp + finish gate
 	var lx2 := keys_x[keys_x.size() - 1]
@@ -300,6 +319,11 @@ func _place_items(k: int, first_key: int, last_key: int, rng: RandomNumberGenera
 				if is_water_at(x):
 					continue
 				coins.add_item(Vector2(x, height_at(x) - 38.0), CoinField.COIN)
+		elif (not downhill) and _is_kite_x(x1):
+			# the risky high line over a kite: a bigger arc above its body (the low line gets nothing extra)
+			for j in KITE_ARC_COINS:
+				var u := -1.0 + 2.0 * j / float(KITE_ARC_COINS - 1)
+				coins.add_item(Vector2(x1 + u * KITE_ARC_HALF, keys_y[i + 1] - KITE_ARC_TOP + u * u * 120.0), CoinField.COIN)
 		elif (not downhill) and roll < 0.3:
 			var cx := x1 + 260.0
 			var top := keys_y[i + 1] - rng.randf_range(250.0, 420.0)
@@ -315,6 +339,13 @@ func _place_items(k: int, first_key: int, last_key: int, rng: RandomNumberGenera
 					continue
 				props.append({"x": px, "kind": prop_kind, "island": k, "s": rng.randf_range(0.8, 1.3)})
 		i += 1
+
+
+func _is_kite_x(x: float) -> bool:
+	for kt in kites:
+		if absf(float(kt.x) - x) < 0.5:
+			return true
+	return false
 
 
 func _material_for(island: int) -> ShaderMaterial:
