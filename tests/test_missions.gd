@@ -388,3 +388,13 @@ func test_mission_level_done_shows_missions() -> String:
 	var r := "" if _count_label(g.result_panel, "Selesai! +75") == 1 else "no Selesai! +75 on the level done screen"
 	Game.apply_save(keep)
 	return r
+
+
+func test_mission_progress_saved_at_settle() -> String:
+	var keep := _fresh()
+	Game.mission_event("skim", 2)   # finishes nothing
+	var before := Game.save_count
+	Game.settle_missions()
+	var n := Game.save_count - before
+	Game.apply_save(keep)
+	return "" if n >= 1 else "unfinished mission progress was not saved at the end of the run"

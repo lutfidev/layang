@@ -25,6 +25,7 @@ var daily_streak: int = 0
 var level_stars: Dictionary = {}   # adventure level id -> best stars (0..3)
 var missions: Array = []           # 3 active missions: {id, progress} (templates in Missions)
 var mission_seq: int = 0           # index of the next template to offer
+var save_count := 0                # save requests so far (lets tests see that a save happened under --nosave)
 ## Adventure level being played ("" = endless run). Set by the level map or `--level=<id>`.
 var current_level: String = ""
 
@@ -174,6 +175,7 @@ func settle_missions() -> Array:
 			done.append({"id": a.id, "reward": r})
 			total += r
 	if done.is_empty():
+		save_game()   # keep the run's progress even when nothing finished
 		return done
 	missions = missions.filter(func(a: Dictionary) -> bool: return not mission_done(a))
 	ensure_missions()
@@ -250,6 +252,7 @@ func toggle_music() -> void:
 # ---------------------------------------------------------------- save / load
 
 func save_game() -> void:
+	save_count += 1
 	if dev.has("nosave"):   # tests / balance sims must not touch the player's save
 		return
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
